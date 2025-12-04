@@ -191,4 +191,10 @@ Contributions are welcome! Please open an issue or pull request for any bugs or 
 
 --- 
 
+Bug fixes:
+- 12-04-2025: defaulted `log_stream` to `stdout` if test set config function not called
+    Prior to fix, if the config function was not called, the `log_stream` was `null` so would _`seg-fault`_. The options were to _not_ log anything if `log_stream` was left null; or, set to `stdout`
+
+---
+
 I am currently working on expanding capabilities. I am open to feature requests as long as there is a value add for the general public.
