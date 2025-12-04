@@ -31,8 +31,8 @@ LIB_TST_OBJS = $(patsubst $(LIB_TEST_DIR)/%.c, $(TST_BUILD_DIR)/%.o, $(LIB_TST_S
 HEADER = $(INCLUDE_DIR)/sigtest.h
 LIB_TEST_HEADER = $(LIB_TEST_DIR)/math_utils.h
 
-LIB_TARGET = $(LIB_DIR)/libsigtest.so
-BIN_TARGET = $(BIN_DIR)/sigtest
+LIB_TARGET = $(LIB_DIR)/libstest.so
+BIN_TARGET = $(BIN_DIR)/stest
 TST_TARGET = $(TST_BUILD_DIR)/run_tests
 # objectify
 OBJECTIFY_TARGET = $(BIN_DIR)/objectify

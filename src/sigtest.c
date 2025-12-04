@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <setjmp.h>
 #include <math.h>
-#include <float.h>  //	for FLT_EPSILON && DBL_EPSILON
+#include <float.h>	//	for FLT_EPSILON && DBL_EPSILON
 #include <string.h> // 	for jmp_buf and related functions
 #include <strings.h>
 #include <stdarg.h>
@@ -33,19 +33,19 @@ static jmp_buf jmpbuffer;
 #define EXPECT_THROW_FAIL "Expected test to throw but it didn't"
 // For dynamic test state annotation
 const char *TEST_STATES[] = {
-	 "PASS",
-	 "FAIL",
-	 "SKIP",
-	 NULL,
+	"PASS",
+	"FAIL",
+	"SKIP",
+	NULL,
 };
 // For dynamic log level annotation
 static const char *DBG_LEVELS[] = {
-	 "DEBUG",
-	 "INFO",
-	 "WARNING",
-	 "ERROR",
-	 "FATAL",
-	 NULL,
+	"DEBUG",
+	"INFO",
+	"WARNING",
+	"ERROR",
+	"FATAL",
+	NULL,
 };
 //	system clock structures
 #define SYS_CLOCK SYS_clock_gettime
@@ -107,16 +107,16 @@ SigtestHooks init_hooks(const char *name)
 		return NULL; // Memory allocation failed
 	}
 	*hooks = (struct sigtest_hooks_s){
-		 .name = strdup(name),
-		 .before_set = NULL,
-		 .after_set = NULL,
-		 .before_test = NULL,
-		 .after_test = NULL,
-		 .on_start_test = NULL,
-		 .on_end_test = NULL,
-		 .on_error = NULL,
-		 .on_test_result = NULL,
-		 .context = NULL,
+		.name = strdup(name),
+		.before_set = NULL,
+		.after_set = NULL,
+		.before_test = NULL,
+		.after_test = NULL,
+		.on_start_test = NULL,
+		.on_end_test = NULL,
+		.on_error = NULL,
+		.on_test_result = NULL,
+		.context = NULL,
 	};
 
 	return hooks;
@@ -590,17 +590,17 @@ static void assert_skip(const string fmt, ...)
 	IAssert interface
 */
 const IAssert Assert = {
-	 .isTrue = assert_is_true,
-	 .isFalse = assert_is_false,
-	 .isNull = assert_is_null,
-	 .isNotNull = assert_is_not_null,
-	 .areEqual = assert_are_equal,
-	 .areNotEqual = assert_are_not_equal,
-	 .floatWithin = assert_float_within,
-	 .stringEqual = assert_string_equal,
-	 .throw = assert_throw,
-	 .fail = assert_fail,
-	 .skip = assert_skip,
+	.isTrue = assert_is_true,
+	.isFalse = assert_is_false,
+	.isNull = assert_is_null,
+	.isNotNull = assert_is_not_null,
+	.areEqual = assert_are_equal,
+	.areNotEqual = assert_are_not_equal,
+	.floatWithin = assert_float_within,
+	.stringEqual = assert_string_equal,
+	.throw = assert_throw,
+	.fail = assert_fail,
+	.skip = assert_skip,
 };
 
 /*
@@ -659,9 +659,16 @@ void testset(string name, ConfigFunc config, CleanupFunc cleanup)
 		{
 			set->log_stream = stdout; // Fallback to stdout if config fails
 		}
-		set->logger->log = log_message;
-		set->logger->debug = log_debug;
 	}
+	else
+	{
+		// no config function we need to default log_stream to console output
+		set->log_stream = stdout;
+	}
+
+	set->logger->log = log_message;
+	set->logger->debug = log_debug;
+
 	// Handle allocation failure after config
 	if (!set->name)
 	{
@@ -984,16 +991,16 @@ static struct
 	ts_time end;
 } default_ctx = {0, 0, {0, 0}, {0, 0}};
 static const sigtest_hooks_s default_hooks = {
-	 .name = "default",
-	 .before_set = NULL,
-	 .after_set = NULL,
-	 .before_test = default_before_test,
-	 .on_start_test = default_on_start_test,
-	 .on_end_test = default_on_end_test,
-	 .after_test = default_after_test,
-	 .on_error = default_on_error,
-	 .on_test_result = default_on_test_result,
-	 .context = &default_ctx};
+	.name = "default",
+	.before_set = NULL,
+	.after_set = NULL,
+	.before_test = default_before_test,
+	.on_start_test = default_on_start_test,
+	.on_end_test = default_on_end_test,
+	.after_test = default_after_test,
+	.on_error = default_on_error,
+	.on_test_result = default_on_test_result,
+	.context = &default_ctx};
 //	 initialize on start up
 __attribute__((constructor)) static void init_default_hooks(void)
 {
@@ -1085,7 +1092,7 @@ int run_tests(TestSet sets, SigtestHooks test_hooks)
 		{
 			get_timestamp(timestamp, "%Y-%m-%d  %H:%M:%S");
 			fwritelnf(set->log_stream, "[%d] %-25s:%4d %-10s%s",
-						 set_sequence, set->name, set->count, ":", timestamp);
+					  set_sequence, set->name, set->count, ":", timestamp);
 			fwritelnf(set->log_stream, "=================================================================");
 		}
 
@@ -1228,7 +1235,7 @@ int run_tests(TestSet sets, SigtestHooks test_hooks)
 		{
 			fwritelnf(set->log_stream, "=================================================================");
 			fwritelnf(set->log_stream, "[%d]     TESTS=%3d        PASS=%3d        FAIL=%3d        SKIP=%3d",
-						 set_sequence, tc_total, tc_passed, tc_failed, tc_skipped);
+					  set_sequence, tc_total, tc_passed, tc_failed, tc_skipped);
 		}
 
 		if (set->cleanup)
@@ -1240,7 +1247,7 @@ int run_tests(TestSet sets, SigtestHooks test_hooks)
 	// Final output to stdout
 	fwritelnf(stdout, "=================================================================");
 	fwritelnf(stdout, "Tests run: %d, Passed: %d, Failed: %d, Skipped: %d",
-				 total_tests, current_set->passed, current_set->failed, current_set->skipped);
+			  total_tests, current_set->passed, current_set->failed, current_set->skipped);
 	fwritelnf(stdout, "Total test sets registered: %d", total_sets);
 
 	return current_set->failed > 0 ? EXIT_FAILURE : EXIT_SUCCESS;

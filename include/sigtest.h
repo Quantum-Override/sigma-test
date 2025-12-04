@@ -38,7 +38,7 @@ typedef struct sigtest_hooks_s *SigtestHooks;
 typedef struct sigtest_logger_s *Logger;
 
 typedef void (*TestFunc)(void);		 // Test function pointer
-typedef void (*CaseOp)(void);			 // Test case operation function pointer - setup/teardown
+typedef void (*CaseOp)(void);		 // Test case operation function pointer - setup/teardown
 typedef void (*ConfigFunc)(FILE **); // Test set config function pointer
 typedef void (*CleanupFunc)(void);	 // Test set cleanup function pointer
 // typedef void (*OutputFunc)(const TestSet, const TestCase, const object); // Output formatting function
@@ -170,8 +170,8 @@ typedef struct sigtest_case_s
 {
 	string name;
 	TestFunc test_func; /* Test function pointer */
-	int expect_fail;	  /* Expect failure flag */
-	int expect_throw;	  /* Expect throw flag */
+	int expect_fail;	/* Expect failure flag */
+	int expect_throw;	/* Expect throw flag */
 	struct
 	{
 		TestState state;
@@ -185,7 +185,7 @@ typedef struct sigtest_case_s
  */
 typedef struct sigtest_logger_s
 {
-	void (*log)(const char *, ...);					 /* Logging function pointer */
+	void (*log)(const char *, ...);				  /* Logging function pointer */
 	void (*debug)(DebugLevel, const char *, ...); /* Debug logging function pointer */
 } sigtest_logger_s;
 
@@ -194,21 +194,21 @@ typedef struct sigtest_logger_s
  */
 typedef struct sigtest_set_s
 {
-	string name;			/* Test set name */
+	string name;		 /* Test set name */
 	CleanupFunc cleanup; /* Test set cleanup function */
-	CaseOp setup;			/* Test case setup function */
-	CaseOp teardown;		/* Test case teardown function */
-	FILE *log_stream;		/* Log stream for the test set */
-	TestCase cases;		/* Pointer to the test cases */
-	TestCase tail;			/* Pointer to the last test case */
-	int count;				/* Number of test cases */
-	int passed;				/* Number of passed test cases */
-	int failed;				/* Number of failed test cases */
-	int skipped;			/* Number of skipped test cases */
-	TestCase current;		/* Current test case */
-	TestSet next;			/* Pointer to the next test set */
-	SigtestHooks hooks;	/* Hooks for the test set */
-	Logger logger;			/* Logger for the test set */
+	CaseOp setup;		 /* Test case setup function */
+	CaseOp teardown;	 /* Test case teardown function */
+	FILE *log_stream;	 /* Log stream for the test set */
+	TestCase cases;		 /* Pointer to the test cases */
+	TestCase tail;		 /* Pointer to the last test case */
+	int count;			 /* Number of test cases */
+	int passed;			 /* Number of passed test cases */
+	int failed;			 /* Number of failed test cases */
+	int skipped;		 /* Number of skipped test cases */
+	TestCase current;	 /* Current test case */
+	TestSet next;		 /* Pointer to the next test set */
+	SigtestHooks hooks;	 /* Hooks for the test set */
+	Logger logger;		 /* Logger for the test set */
 } sigtest_set_s;
 
 /**
@@ -295,16 +295,16 @@ void get_timestamp(char *, const char *);
  */
 typedef struct sigtest_hooks_s
 {
-	const char *name;																// Hooks label
-	void (*before_set)(const TestSet, object);							// Called before each test set
-	void (*after_set)(const TestSet, object);								// Called after each test set
-	void (*before_test)(object);												// Called before each test case
-	void (*after_test)(object);												// Called after each test case
-	void (*on_start_test)(object);											// Callback at the start of a test
-	void (*on_end_test)(object);												// Callback at the end of a test
-	void (*on_error)(const char *, object);								// Callback on error
+	const char *name;											   // Hooks label
+	void (*before_set)(const TestSet, object);					   // Called before each test set
+	void (*after_set)(const TestSet, object);					   // Called after each test set
+	void (*before_test)(object);								   // Called before each test case
+	void (*after_test)(object);									   // Called after each test case
+	void (*on_start_test)(object);								   // Callback at the start of a test
+	void (*on_end_test)(object);								   // Callback at the end of a test
+	void (*on_error)(const char *, object);						   // Callback on error
 	void (*on_test_result)(const TestSet, const TestCase, object); // Callback on test result
-	void *context;																	// User-defined data
+	void *context;												   // User-defined data
 } sigtest_hooks_s;
 /**
  * @brief Test hooks registry
