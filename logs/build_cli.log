@@ -1,2 +1,0 @@
-gcc -Wall -g -fPIC -Iinclude -c src/sigtest_cli.c -o build/sigtest_cli.o
-gcc  build/sigtest_cli.o -o bin/sigtest -g -Lbin/lib -lsigtest -Wl,-rpath,bin/lib

@@ -16,7 +16,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-#define SIGTEST_VERSION "0.03.01"
+#define SIGTEST_VERSION "0.03.00"
 
 // Global test set "registry"
 TestSet test_sets = NULL;
@@ -93,7 +93,7 @@ SigtestHooks init_hooks(const char *name)
 		}
 	}
 	// or create a new one
-	SigtestHooks hooks = malloc(sizeof(struct sigtest_hooks_s));
+	SigtestHooks hooks = __real_malloc(sizeof(struct sigtest_hooks_s));
 	if (!hooks)
 	{
 		fwritelnf(stderr, "Error: Failed to allocate memory for hooks");
@@ -103,7 +103,7 @@ SigtestHooks init_hooks(const char *name)
 	if (!hooks->name)
 	{
 		fwritelnf(stderr, "Error: Failed to duplicate hook name");
-		free(hooks);
+		__real_free(hooks);
 		return NULL; // Memory allocation failed
 	}
 	*hooks = (struct sigtest_hooks_s){
@@ -136,27 +136,27 @@ static void cleanup_test_runner(void)
 		while (tc)
 		{
 			TestCase next_tc = tc->next;
-			free(tc->name);
+			__real_free(tc->name);
 			if (tc->test_result.message)
-				free(tc->test_result.message);
+				__real_free(tc->test_result.message);
 
-			free(tc);
+			__real_free(tc);
 			tc = next_tc;
 		}
 
 		// free test set
-		free(set->name);
+		__real_free(set->name);
 		if (set->log_stream != stdout && set->log_stream)
 		{
 			fclose(set->log_stream);
 			set->log_stream = NULL;
 		}
 
-		free(set);
+		__real_free(set);
 		set = next;
 	}
 	if (current_set && current_set->logger)
-		free(current_set->logger);
+		__real_free(current_set->logger);
 
 	// Reset the test set registry
 	test_sets = NULL;
@@ -237,7 +237,7 @@ void set_test_context(TestState result, const string message)
 		current_set->current->test_result.state = result;
 		if (current_set->current->test_result.message)
 		{
-			free(current_set->current->test_result.message);
+			__real_free(current_set->current->test_result.message);
 		}
 		current_set->current->test_result.message = message ? strdup(message) : NULL;
 		if (result != PASS)
@@ -620,7 +620,7 @@ void testset(string name, ConfigFunc config, CleanupFunc cleanup)
 		atexit_registered = 1;
 	}
 
-	TestSet set = malloc(sizeof(struct sigtest_set_s));
+	TestSet set = __real_malloc(sizeof(struct sigtest_set_s));
 	if (!set)
 	{
 		fwritelnf(stdout, "Failed to allocate memory for test set\n");
@@ -639,11 +639,11 @@ void testset(string name, ConfigFunc config, CleanupFunc cleanup)
 	set->skipped = 0;
 	set->current = NULL;
 	set->next = test_sets;
-	set->logger = malloc(sizeof(struct sigtest_logger_s));
+	set->logger = __real_malloc(sizeof(struct sigtest_logger_s));
 	if (!set->logger)
 	{
 		fwritelnf(stdout, "Failed to allocate memory for test set logger\n");
-		free(set);
+		__real_free(set);
 		exit(EXIT_FAILURE);
 	}
 
@@ -674,7 +674,7 @@ void testset(string name, ConfigFunc config, CleanupFunc cleanup)
 	{
 		if (set->log_stream != stdout && set->log_stream)
 			fclose(set->log_stream);
-		free(set);
+		__real_free(set);
 		writelnf("Failed to allocate memory for test set name\n");
 		exit(EXIT_FAILURE);
 	}
@@ -692,7 +692,7 @@ void testcase(string name, TestFunc func)
 		testset("default", NULL, NULL);
 	}
 
-	TestCase tc = malloc(sizeof(struct sigtest_case_s));
+	TestCase tc = __real_malloc(sizeof(struct sigtest_case_s));
 	if (!tc)
 	{
 		writef("Failed to allocate memory for test case `%s`\n", name);
@@ -702,7 +702,7 @@ void testcase(string name, TestFunc func)
 	if (!tc->name)
 	{
 		writef("Failed to allocate memory for test case name `%s`\n", name);
-		free(tc);
+		__real_free(tc);
 
 		exit(EXIT_FAILURE); // cleanup_test_sets will handle freeing
 	}
@@ -711,6 +711,8 @@ void testcase(string name, TestFunc func)
 	tc->expect_throw = FALSE;
 	tc->test_result.state = PASS;
 	tc->test_result.message = NULL;
+	tc->memcheck_was_enabled = 0;
+	tc->memcheck_expected_leaks = -1;
 	tc->next = NULL;
 
 	if (!current_set->cases)
@@ -736,7 +738,7 @@ void fail_testcase(string name, void (*func)(void))
 		testset("default", NULL, NULL);
 	}
 
-	TestCase tc = malloc(sizeof(struct sigtest_case_s));
+	TestCase tc = __real_malloc(sizeof(struct sigtest_case_s));
 	if (!tc)
 	{
 		writef("Failed to allocate memory for test case `%s`\n", name);
@@ -746,7 +748,7 @@ void fail_testcase(string name, void (*func)(void))
 	if (!tc->name)
 	{
 		writef("Failed to allocate memory for test case name `%s`\n", name);
-		free(tc);
+		__real_free(tc);
 
 		exit(EXIT_FAILURE); // cleanup_test_sets will handle freeing
 	}
@@ -755,6 +757,8 @@ void fail_testcase(string name, void (*func)(void))
 	tc->expect_throw = FALSE;
 	tc->test_result.state = PASS; // Set to PASS initially, evaluated in main
 	tc->test_result.message = NULL;
+	tc->memcheck_was_enabled = 0;
+	tc->memcheck_expected_leaks = -1;
 	tc->next = NULL;
 
 	if (!current_set->cases)
@@ -780,7 +784,7 @@ void testcase_throws(string name, void (*func)(void))
 		testset("default", NULL, NULL);
 	}
 
-	TestCase tc = malloc(sizeof(struct sigtest_case_s));
+	TestCase tc = __real_malloc(sizeof(struct sigtest_case_s));
 	if (!tc)
 	{
 		writef("Failed to allocate memory for test case `%s`\n", name);
@@ -790,7 +794,7 @@ void testcase_throws(string name, void (*func)(void))
 	if (!tc->name)
 	{
 		writef("Failed to allocate memory for test case name `%s`\n", name);
-		free(tc);
+		__real_free(tc);
 
 		exit(EXIT_FAILURE); // cleanup_test_sets will handle freeing
 	}
@@ -839,7 +843,7 @@ void teardown_testcase(CaseOp teardown)
 */
 void register_hooks(SigtestHooks hooks)
 {
-	HookRegistry *entry = malloc(sizeof(HookRegistry));
+	HookRegistry *entry = __real_malloc(sizeof(HookRegistry));
 	if (!entry)
 	{
 		fwritelnf(stderr, "Error: Failed to allocate hook registry entry");
@@ -892,7 +896,7 @@ static void default_on_start_test(object context)
 		current_set->logger->log("Starting test: %s\n", current_set->current->name);
 	}
 }
-static void default_on_end_test(object context)
+static void default_on_end_test(TestSet set, object context)
 {
 	struct
 	{
@@ -900,6 +904,7 @@ static void default_on_end_test(object context)
 		int verbose;
 		ts_time start;
 		ts_time end;
+		TestState state;
 	} *ctx = context;
 
 	if (sys_gettime(&ctx->end) == -1)
@@ -907,12 +912,15 @@ static void default_on_end_test(object context)
 		fwritelnf(stderr, "Error: Failed to get system end time");
 		exit(EXIT_FAILURE);
 	}
-	if (ctx->verbose && current_set)
+	if (ctx->verbose && set)
 	{
-		current_set->logger->log("Finished test: %s\n", current_set->current->name);
+		set->logger->log("Finished test: %s\n", set->current->name);
+		set->logger->log("Test state: %s\n", TEST_STATES[set->current->test_result.state]);
 	}
+
+	ctx->state = set->current->test_result.state;
 }
-static void default_after_test(object context)
+static void default_after_test(TestSet set, object context)
 {
 	struct
 	{
@@ -920,8 +928,9 @@ static void default_after_test(object context)
 		int verbose;
 		ts_time start;
 		ts_time end;
+		TestState state;
 	} *ctx = context;
-
+	ctx->state = set->current->test_result.state;
 	ctx->count--;
 }
 static void default_on_test_result(const TestSet set, const TestCase tc, object context)
@@ -1004,7 +1013,7 @@ static const sigtest_hooks_s default_hooks = {
 //	 initialize on start up
 __attribute__((constructor)) static void init_default_hooks(void)
 {
-	HookRegistry *entry = malloc(sizeof(HookRegistry));
+	HookRegistry *entry = __real_malloc(sizeof(HookRegistry));
 	// if we don't have a valid hooks registry, we exit
 	if (!entry)
 	{
@@ -1129,7 +1138,7 @@ int run_tests(TestSet sets, SigtestHooks test_hooks)
 			// on end test handler
 			if (hooks && hooks->on_end_test)
 			{
-				hooks->on_end_test(hooks->context);
+				hooks->on_end_test(set, hooks->context);
 			}
 			//	test case teardown
 			if (set->teardown)
@@ -1140,7 +1149,7 @@ int run_tests(TestSet sets, SigtestHooks test_hooks)
 			//	after test case teardown
 			if (hooks && hooks->after_test)
 			{
-				hooks->after_test(hooks->context);
+				hooks->after_test(set, hooks->context);
 			}
 
 			// process test result
@@ -1151,7 +1160,7 @@ int run_tests(TestSet sets, SigtestHooks test_hooks)
 					tc->test_result.state = PASS;
 					if (tc->test_result.message)
 					{
-						free(tc->test_result.message);
+						__real_free(tc->test_result.message);
 						tc->test_result.message = strdup("Expected failure occurred");
 					}
 				}
@@ -1159,7 +1168,7 @@ int run_tests(TestSet sets, SigtestHooks test_hooks)
 				{
 					tc->test_result.state = FAIL;
 					if (tc->test_result.message)
-						free(tc->test_result.message);
+						__real_free(tc->test_result.message);
 					tc->test_result.message = strdup("Expected failure but passed");
 				}
 			}
@@ -1170,7 +1179,7 @@ int run_tests(TestSet sets, SigtestHooks test_hooks)
 					tc->test_result.state = PASS;
 					if (tc->test_result.message)
 					{
-						free(tc->test_result.message);
+						__real_free(tc->test_result.message);
 						tc->test_result.message = strdup("Expected throw occurred");
 					}
 				}
@@ -1178,7 +1187,7 @@ int run_tests(TestSet sets, SigtestHooks test_hooks)
 				{
 					tc->test_result.state = FAIL;
 					if (tc->test_result.message)
-						free(tc->test_result.message);
+						__real_free(tc->test_result.message);
 					tc->test_result.message = strdup("Expected throw but passed");
 				}
 			}

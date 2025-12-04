@@ -1,7 +1,0 @@
-Verbose mode enabled
-input=templates/main.txt
-output=src/templates/main_template.ct
-object=resources/main_template.ro
-Encoding templates/main.txt -> src/templates/main_template.ct
-gcc -Wall -g -Iinclude -w -x c -c src/templates/main_template.ct -o resources/main_template.ro
-success=true

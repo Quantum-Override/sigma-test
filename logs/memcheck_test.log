@@ -1,0 +1,12 @@
+Test Source: test/test_memcheck.c
+MemCheck: enabled for test set 'Memory Check Tests'
+
+MemCheck: detected 1 leak(s) (unexpected)
+
+[FAIL]
+     Memory leaks detected: 1 leaked block(s)[PASS]
+MemCheck: detected 3 leak(s)
+
+[FAIL]
+     Memory leaks detected: 3 leaked block(s), expected 1=================================================================
+[1]     TESTS=  3        PASS=  1        FAIL=  2        SKIP=  0

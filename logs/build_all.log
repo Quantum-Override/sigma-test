@@ -1,6 +1,0 @@
-find build -type f -delete
-find bin -type f -delete
-gcc -Wall -g -fPIC -Iinclude -DSIGTEST_TEST -c src/sigtest.c -o build/sigtest.o
-gcc  build/sigtest.o -o bin/lib/libsigtest.so -shared
-gcc -Wall -g -fPIC -Iinclude -c src/sigtest_cli.c -o build/sigtest_cli.o
-gcc  build/sigtest_cli.o -o bin/sigtest -g -Lbin/lib -lsigtest -Wl,-rpath,bin/lib

@@ -1,8 +1,0 @@
-Test Source: test/test_configs.c
-[1] configs_set              :   3 :         2025-05-20  10:28:28
-=================================================================
-Running setupRunning teardownRunning: varargs_message                          0.9 us  [PASS]
-Running setupRunning teardownRunning: suite_config_cleanup                     0.4 us  [PASS]
-Running setupRunning teardownRunning: testcase_setup_teardown                  0.2 us  [PASS]
-Running set cleanup=================================================================
-[1]     TESTS=  3        PASS=  3        FAIL=  0        SKIP=  0

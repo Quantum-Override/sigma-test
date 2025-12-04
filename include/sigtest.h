@@ -23,6 +23,12 @@
 #define FALSE 0
 #endif
 
+// Forward declarations: __real_* functions for memory wrapping
+void *__real_malloc(size_t size);
+void *__real_calloc(size_t n, size_t s);
+void *__real_realloc(void *p, size_t s);
+void __real_free(void *p);
+
 struct sigtest_case_s;
 struct sigtest_set_s;
 struct sigtest_hooks_s;
@@ -177,7 +183,11 @@ typedef struct sigtest_case_s
 		TestState state;
 		string message;
 	} test_result;
-	TestCase next; /* Pointer to the next test case */
+	int memcheck_was_enabled;	 // 1 if MemCheck.enable() ever called
+	int memcheck_expected_leaks; // -1 = no expectation, else expected count
+	int memcheck_leaks_detected; // number of leaks detected
+	long memcheck_bytes_leaked;	 // number of bytes leaked
+	TestCase next;				 /* Pointer to the next test case */
 } sigtest_case_s;
 
 /**
@@ -299,11 +309,12 @@ typedef struct sigtest_hooks_s
 	void (*before_set)(const TestSet, object);					   // Called before each test set
 	void (*after_set)(const TestSet, object);					   // Called after each test set
 	void (*before_test)(object);								   // Called before each test case
-	void (*after_test)(object);									   // Called after each test case
+	void (*after_test)(TestSet, object);						   // Called after each test case
 	void (*on_start_test)(object);								   // Callback at the start of a test
-	void (*on_end_test)(object);								   // Callback at the end of a test
+	void (*on_end_test)(TestSet, object);						   // Callback at the end of a test
 	void (*on_error)(const char *, object);						   // Callback on error
 	void (*on_test_result)(const TestSet, const TestCase, object); // Callback on test result
+	void (*drop_hook)(object);									   // Drop the hook
 	void *context;												   // User-defined data
 } sigtest_hooks_s;
 /**
