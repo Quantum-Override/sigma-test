@@ -45,7 +45,6 @@ typedef struct IMemCheck
 {
 	void (*enable)(void);	   /**< Enables memory leak detection. */
 	void (*disable)(void);	   /**< Disables memory leak detection and reports leaks. */
-	void (*expectLeaks)(int);  /**< Marks the next allocation as expected to leak. */
 	int (*isEnabled)(void);	   /**< Returns 1 if leak detection is enabled, 0 if not. */
 	int (*leakedBlocks)(void); /**< Returns the number of leaked memory blocks */
 	long (*leakedBytes)(void); /**< Returns the number of leaked bytes */

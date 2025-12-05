@@ -365,6 +365,14 @@ static void assert_are_equal(object expected, object actual, AssertType type, co
 		}
 
 		break;
+	case LONG:
+		if (*(long *)expected != *(long *)actual)
+		{
+			failMessage = gen_equals_fail_msg(expected, actual, type, fmt, args);
+			result = FAIL;
+		}
+
+		break;
 	case FLOAT:
 		if (fabs(*(float *)expected - *(float *)actual) > FLT_EPSILON)
 		{
@@ -896,7 +904,7 @@ static void default_on_start_test(object context)
 		current_set->logger->log("Starting test: %s\n", current_set->current->name);
 	}
 }
-static void default_on_end_test(TestSet set, object context)
+static void default_on_end_test(object context)
 {
 	struct
 	{
@@ -904,7 +912,7 @@ static void default_on_end_test(TestSet set, object context)
 		int verbose;
 		ts_time start;
 		ts_time end;
-		TestState state;
+		TestCase *tc;
 	} *ctx = context;
 
 	if (sys_gettime(&ctx->end) == -1)
@@ -912,15 +920,15 @@ static void default_on_end_test(TestSet set, object context)
 		fwritelnf(stderr, "Error: Failed to get system end time");
 		exit(EXIT_FAILURE);
 	}
-	if (ctx->verbose && set)
+	if (ctx->verbose && current_set)
 	{
-		set->logger->log("Finished test: %s\n", set->current->name);
-		set->logger->log("Test state: %s\n", TEST_STATES[set->current->test_result.state]);
+		current_set->logger->log("Finished test: %s\n", current_set->current->name);
+		current_set->logger->log("Test state: %s\n", TEST_STATES[current_set->current->test_result.state]);
 	}
 
-	ctx->state = set->current->test_result.state;
+	ctx->tc = &current_set->current;
 }
-static void default_after_test(TestSet set, object context)
+static void default_after_test(object context)
 {
 	struct
 	{
@@ -928,9 +936,9 @@ static void default_after_test(TestSet set, object context)
 		int verbose;
 		ts_time start;
 		ts_time end;
-		TestState state;
+		TestCase *tc;
 	} *ctx = context;
-	ctx->state = set->current->test_result.state;
+	ctx->tc = &current_set->current;
 	ctx->count--;
 }
 static void default_on_test_result(const TestSet set, const TestCase tc, object context)
@@ -1092,10 +1100,29 @@ int run_tests(TestSet sets, SigtestHooks test_hooks)
 		// Set current_set to the executing set for writef/debugf
 		current_set = set;
 
+		struct
+		{
+			int count;
+			int verbose;
+			ts_time start;
+			ts_time end;
+			TestCase *tc;
+		} *ctx;
+		hooks->context = ctx = __real_malloc(sizeof(*ctx));
+		if (!ctx)
+		{
+			hooks->context = NULL;
+		}
+		ctx->count = 0;
+		ctx->verbose = 1;
+		ctx->start = (ts_time){0, 0};
+		ctx->end = (ts_time){0, 0};
+		ctx->tc = &set->current;
+
 		// Call before_set hook if defined
 		if (hooks && hooks->before_set)
 		{
-			hooks->before_set(set, hooks->context);
+			hooks->before_set(hooks->context);
 		}
 		else
 		{
@@ -1138,7 +1165,7 @@ int run_tests(TestSet sets, SigtestHooks test_hooks)
 			// on end test handler
 			if (hooks && hooks->on_end_test)
 			{
-				hooks->on_end_test(set, hooks->context);
+				hooks->on_end_test(hooks->context);
 			}
 			//	test case teardown
 			if (set->teardown)
@@ -1149,7 +1176,7 @@ int run_tests(TestSet sets, SigtestHooks test_hooks)
 			//	after test case teardown
 			if (hooks && hooks->after_test)
 			{
-				hooks->after_test(set, hooks->context);
+				hooks->after_test(hooks->context);
 			}
 
 			// process test result

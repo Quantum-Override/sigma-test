@@ -68,6 +68,7 @@ extern TestSet test_sets; // Global test set registry
 typedef enum
 {
 	INT,
+	LONG,
 	FLOAT,
 	DOUBLE,
 	CHAR,
@@ -306,12 +307,12 @@ void get_timestamp(char *, const char *);
 typedef struct sigtest_hooks_s
 {
 	const char *name;											   // Hooks label
-	void (*before_set)(const TestSet, object);					   // Called before each test set
+	void (*before_set)(object);									   // Called before each test set
 	void (*after_set)(const TestSet, object);					   // Called after each test set
 	void (*before_test)(object);								   // Called before each test case
-	void (*after_test)(TestSet, object);						   // Called after each test case
+	void (*after_test)(object);									   // Called after each test case
 	void (*on_start_test)(object);								   // Callback at the start of a test
-	void (*on_end_test)(TestSet, object);						   // Callback at the end of a test
+	void (*on_end_test)(object);								   // Callback at the end of a test
 	void (*on_error)(const char *, object);						   // Callback on error
 	void (*on_test_result)(const TestSet, const TestCase, object); // Callback on test result
 	void (*drop_hook)(object);									   // Drop the hook

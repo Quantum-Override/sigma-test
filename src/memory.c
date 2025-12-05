@@ -23,7 +23,6 @@ static volatile struct
 static FILE *logstream = NULL;
 
 static __thread int memcheck_enabled_this_test = 0;
-static __thread int expected_leaks_this_test = -1;
 
 static void grow(void)
 {
@@ -105,9 +104,18 @@ void __wrap_free(void *p)
 // IMemCheck — unchanged and perfect
 void MemCheck_enable(void) { memcheck_enabled_this_test = 1; }
 void MemCheck_disable(void) { memcheck_enabled_this_test = 0; }
-void MemCheck_expectLeaks(int n) { expected_leaks_this_test = n; }
 int MemCheck_isEnabled(void) { return memcheck_enabled_this_test; }
 int MemCheck_leakedBlocks(void) { return leaked(); }
+long MemCheck_leakedBytes(void) { return (long)(tracker.used * ADDR_SIZE); }
+void MemCheck_reset(void)
+{
+	// free all tracked blocks
+	for (size_t i = 0; i < tracker.used; i++)
+	{
+		__real_free((void *)tracker.block[i]);
+	}
+	tracker.used = 0;
+}
 
 char *format_memory_leak_message(int leaked, int exp)
 {
@@ -130,33 +138,45 @@ char *format_memory_leak_message(int leaked, int exp)
 	return buffer;
 }
 
-static void on_end_test(TestSet set, object ctx)
+static void on_end_test(object context)
 {
+	struct
+	{
+		int count;
+		int verbose;
+		ts_time start;
+		ts_time end;
+		TestCase *tc;
+	} *ctx = context;
+
 	if (!memcheck_enabled_this_test)
 		return;
 
 	int leaked = MemCheck_leakedBlocks();
-	int exp = expected_leaks_this_test;
-	TestCase tc = set->current;
 
-	if (exp >= 0 ? leaked != exp : leaked > 0)
+	if (leaked > 0)
 	{
-		fwritelnf(logstream, "MemCheck: detected %d leak(s)%s\n", leaked,
-				  exp >= 0 ? "" : " (unexpected)");
-		tc->test_result.state = FAIL;
-		tc->test_result.message = format_memory_leak_message(leaked, exp);
-		tc->memcheck_leaks_detected = leaked;
-		tc->memcheck_bytes_leaked = tracker.used * ADDR_SIZE;
+		fwritelnf(logstream, "MemCheck: detected %d leak(s)\n", leaked);
+		(*ctx->tc)->test_result.state = FAIL;
+		(*ctx->tc)->test_result.message = format_memory_leak_message(leaked, 0);
+		(*ctx->tc)->memcheck_leaks_detected = leaked;
+		(*ctx->tc)->memcheck_bytes_leaked = tracker.used * ADDR_SIZE;
 	}
 
 	memcheck_enabled_this_test = 0;
-	expected_leaks_this_test = -1;
 }
-static void on_set_start(const TestSet set, object context)
+static void on_set_start(object context)
 {
-	// we want the logging stream
-	fwritelnf(set->log_stream, "MemCheck: enabled for test set '%s'\n", set->name);
-	logstream = set->log_stream;
+	struct
+	{
+		int count;
+		int verbose;
+		ts_time start;
+		ts_time end;
+		TestCase *tc;
+	} *ctx = context;
+
+	(void)ctx; // unused
 }
 
 __attribute__((constructor)) static void init(void)
@@ -170,7 +190,8 @@ __attribute__((constructor)) static void init(void)
 const IMemCheck MemCheck = {
 	.enable = MemCheck_enable,
 	.disable = MemCheck_disable,
-	.expectLeaks = MemCheck_expectLeaks,
 	.isEnabled = MemCheck_isEnabled,
 	.leakedBlocks = MemCheck_leakedBlocks,
+	.leakedBytes = MemCheck_leakedBytes,
+	.reset = MemCheck_reset,
 };

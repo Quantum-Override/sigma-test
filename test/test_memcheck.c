@@ -28,6 +28,7 @@ static void test_leak(void)
 
     Assert.isNotNull(ptr, "Allocation should succeed");
     // no disable needed → auto-checked and failed
+    // MemCheck.reset();
 }
 
 static void test_noleak(void)
@@ -37,17 +38,27 @@ static void test_noleak(void)
     Assert.isNotNull(ptr, "Allocation should succeed");
     free(ptr);
     MemCheck.disable(); // disable to avoid false positive
+    // MemCheck.reset();
 }
 
-// Test expected memory leak -- it failed (12/3/2025)
-static void test_expected_leak(void)
+//  verify size of memory leak detection
+static void test_leak_size(void)
 {
     MemCheck.enable();
-    MemCheck.expectLeaks(1);
-    void *ptr = malloc(50); // expected leak
+    void *ptr = malloc(250); // leak!
 
     Assert.isNotNull(ptr, "Allocation should succeed");
-    // no free needed → expected leak
+    // MemCheck.disable(); // disable to trigger leak report
+
+    int leaked_blocks = MemCheck.leakedBlocks();
+    long leaked_bytes = MemCheck.leakedBytes();
+
+    int expected_leaks = 1;
+    long expected_bytes = 250L;
+
+    Assert.areEqual(&expected_leaks, &leaked_blocks, INT, "Expected %d leaked block, got %d", expected_leaks, leaked_blocks);
+    Assert.areEqual(&expected_bytes, &leaked_bytes, LONG, "Expected %ld leaked bytes, got %ld", expected_bytes, leaked_bytes);
+    // MemCheck.reset();
 }
 
 // Register test cases
@@ -57,7 +68,7 @@ __attribute__((constructor)) void memcheck_detection_tests(void)
     testset("Memory Check Tests", config_testset, NULL);
     writelnf("Test Source: %s", __FILE__);
 
-    testcase("Test Memory Leak Detection", test_leak);
-    testcase("Test No Memory Leak", test_noleak);
-    // testcase("Test Expected Memory Leak", test_expected_leak);
+    testcase("Test Memory Leak Size", test_leak_size);
+    testcase("Test Memory Leak", test_leak);
+    testcase("Test Memory Leak Detection", test_noleak);
 }
