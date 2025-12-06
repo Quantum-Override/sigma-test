@@ -1,0 +1,42 @@
+{
+  "test_set": "hooks_set",
+  "timestamp": "2025-12-06 09:59:44",
+  "tests": [
+    {
+      "test": "JSON: Should Pass",
+      "status": "PASS",
+      "duration_us": "0.294",
+      "message": ""
+    },
+    {
+      "test": "JSON: Should Fail",
+      "status": "FAIL",
+      "duration_us": "0.463",
+      "message": "1 should not equal 0"
+    },
+    {
+      "test": "JSON: Should Expect Fail",
+      "status": "PASS",
+      "duration_us": "0.185",
+      "message": "Expected failure occurred"
+    },
+    {
+      "test": "JSON: Should Skip",
+      "status": "SKIP",
+      "duration_us": "0.208",
+      "message": "This test is skipped"
+    },
+    {
+      "test": "JSON: Should Throw",
+      "status": "FAIL",
+      "duration_us": "0.199",
+      "message": "This test is explicitly thrown"
+    }
+  ],
+  "summary": {
+    "total": 5,
+    "passed": 2,
+    "failed": 2,
+    "skipped": 1
+  }
+}
