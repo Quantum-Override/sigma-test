@@ -1,9 +1,0 @@
-gcc -Wall -g -fPIC -Iinclude -DSIGTEST_TEST -c test/test_hooks.c -o build/test/test_hooks.o
-gcc -Wall -g -fPIC -Iinclude -DSIGTEST_TEST -c src/sigtest.c -o build/sigtest.o
-gcc -Wall -g -fPIC -Iinclude -DSIGTEST_TEST -c src/hooks/json_hooks.c -o build/hooks/json_hooks.o
-gcc build/test/test_hooks.o  build/sigtest.o build/hooks/json_hooks.o -o build/test/test_hooks -g
-[2025-05-20  21:21:19]   Test Set:                      hooks_set
-=================================================================
-Tests run: 4, Passed: 1, Failed: 2, Skipped: 1
-Total test sets registered: 1
-make: *** [Makefile:106: test_hooks] Error 1

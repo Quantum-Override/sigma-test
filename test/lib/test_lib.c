@@ -17,7 +17,7 @@ static void set_config(FILE **log_stream)
 	if (!*log_stream)
 		*log_stream = stdout;
 
-	writef("Demonstration Test Log. Version %s", sigtest_version());
+	writef("Demonstration Test Log. Version %s", st_version());
 }
 
 //	testcases

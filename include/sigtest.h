@@ -1,20 +1,38 @@
-/*	sigtest.h
-	Header for the sigma test assert interface
+/*
+ * Sigma-Test
+ * Copyright (c) 2025 David Boarman (BadKraft) and contributors
+ * QuantumOverride [Q|]
+ * ----------------------------------------------
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * ----------------------------------------------
+ * File: sigtest.h
+ * Description: Header file for Sigma-Test core definitions and interfaces
+ */
+#pragma once
 
-	David Boarman
-	2024-09-01
-
-	SIGTEST_VERSION "0.03.01"
-*/
-#ifndef SIGTEST_H
-#define SIGTEST_H
-
-#include <stdio.h>
+#include "internal/memwrap.h"
 #include <stdarg.h>
+#include <stdio.h>
 #include <time.h>
-// -----
-#include <unistd.h>
+
 #include <sys/syscall.h>
+#include <unistd.h>
 
 #ifndef TRUE
 #define TRUE 1
@@ -23,35 +41,35 @@
 #define FALSE 0
 #endif
 
-struct sigtest_case_s;
-struct sigtest_set_s;
-struct sigtest_hooks_s;
-struct sigtest_logger_s;
+struct st_case_s;
+struct st_set_s;
+struct st_hooks_s;
+struct st_logger_s;
 
 typedef void *object;
 typedef char *string;
 typedef struct timespec ts_time;
 
-typedef struct sigtest_case_s *TestCase;
-typedef struct sigtest_set_s *TestSet;
-typedef struct sigtest_hooks_s *SigtestHooks;
-typedef struct sigtest_logger_s *Logger;
+typedef struct st_case_s *TestCase;
+typedef struct st_set_s *TestSet;
+typedef struct st_hooks_s *ST_Hooks;
+typedef struct st_logger_s *Logger;
 
-typedef void (*TestFunc)(void);		 // Test function pointer
-typedef void (*CaseOp)(void);		 // Test case operation function pointer - setup/teardown
+typedef void (*TestFunc)(void);      // Test function pointer
+typedef void (*CaseOp)(void);        // Test case operation function pointer - setup/teardown
 typedef void (*ConfigFunc)(FILE **); // Test set config function pointer
-typedef void (*CleanupFunc)(void);	 // Test set cleanup function pointer
-// typedef void (*OutputFunc)(const TestSet, const TestCase, const object); // Output formatting function
+typedef void (*CleanupFunc)(void);   // Test set cleanup function pointer
+// typedef void (*OutputFunc)(const TestSet, const TestCase, const object); //
+// Output formatting function
 typedef void (*SetOp)(const TestSet, object); // Test set operation function pointer
 
 // Output debug levels
-typedef enum
-{
-	DBG_DEBUG,	 // Debug level logging
-	DBG_INFO,	 // Info level logging
-	DBG_WARNING, // Warning level logging
-	DBG_ERROR,	 // Error (non-fatal) level logging
-	DBG_FATAL,	 // Fatal error level logging
+typedef enum {
+  DBG_DEBUG,   // Debug level logging
+  DBG_INFO,    // Info level logging
+  DBG_WARNING, // Warning level logging
+  DBG_ERROR,   // Error (non-fatal) level logging
+  DBG_FATAL,   // Fatal error level logging
 } DebugLevel;
 
 extern TestSet test_sets; // Global test set registry
@@ -59,102 +77,98 @@ extern TestSet test_sets; // Global test set registry
 /**
  * @brief Type info enums
  */
-typedef enum
-{
-	INT,
-	FLOAT,
-	DOUBLE,
-	CHAR,
-	PTR,
-	STRING,
-	// Add more types as needed
+typedef enum {
+  INT,
+  LONG,
+  FLOAT,
+  DOUBLE,
+  CHAR,
+  PTR,
+  STRING,
+  // Add more types as needed
 } AssertType;
 /**
  * @brief Test state result
  */
-typedef enum
-{
-	PASS,
-	FAIL,
-	SKIP
-} TestState;
+typedef enum { PASS,
+               FAIL,
+               SKIP } TestState;
 
 /**
  * @brief Assert interface structure with function pointers
  */
-typedef struct IAssert
-{
-	/**
-	 * @brief Asserts the given condition is TRUE
-	 * @param  condition :the condition to check
-	 * @param  fmt :the format message to display if assertion fails
-	 */
-	void (*isTrue)(int, const string, ...);
-	/**
-	 * @brief Asserts the given condition is FALSE
-	 * @param  condition :the condition to check
-	 * @param  fmt :the format message to display if assertion fails
-	 */
-	void (*isFalse)(int, const string, ...);
-	/**
-	 * @brief Asserts that a pointer is NULL
-	 * @param  ptr :the pointer to check
-	 * @param  fmt :the format message to display if assertion fails
-	 */
-	void (*isNull)(object, const string, ...);
-	/**
-	 * @brief Asserts that a pointer is not NULL
-	 * @param  ptr :the pointer to check
-	 * @param  fmt :the format message to display if assertion fails
-	 */
-	void (*isNotNull)(object, const string, ...);
-	/**
-	 * @brief Asserts that two values are equal.
-	 * @param expected :expected value.
-	 * @param actual :actual value to compare.
-	 * @param type :the value types
-	 * @param fmt :format message to display if assertion fails.
-	 */
-	void (*areEqual)(object, object, AssertType, const string, ...);
-	/**
-	 * @brief Asserts that two values are not equal.
-	 * @param expected :expected value.
-	 * @param actual :actual value to compare.
-	 * @param type :the value types
-	 * @param fmt :format message to display if assertion fails.
-	 */
-	void (*areNotEqual)(object, object, AssertType, const string, ...);
-	/**
-	 * @brief Asserts that a float value is within a specified tolerance.
-	 * @param value :the float value to check.
-	 * @param min :the minimum tolerance value.
-	 * @param max :the maximum tolerance value.
-	 * @param fmt :format message to display if assertion fails.
-	 */
-	void (*floatWithin)(float, float, float, const string, ...);
-	/**
-	 * @brief Asserts that two strings are equal.
-	 * @param expected :expected string.
-	 * @param actual :actual string to compare.
-	 * @param case_sensitive :case sensitivity flag.
-	 * @param fmt :format message to display if assertion fails.
-	 */
-	void (*stringEqual)(string, string, int, const string, ...);
-	/**
-	 * @brief Assert throws an exception
-	 * @param fmt :the format message to display if assertion fails
-	 */
-	void (*throw)(const string, ...);
-	/**
-	 * @brief Fails a testcase immediately and logs the message
-	 * @param fmt :the format message to display
-	 */
-	void (*fail)(const string, ...);
-	/**
-	 * @brief Skips the testcase setting the state as skipped and logs the message
-	 * @param fmt :the format message to display
-	 */
-	void (*skip)(const string, ...);
+typedef struct IAssert {
+  /**
+   * @brief Asserts the given condition is TRUE
+   * @param  condition :the condition to check
+   * @param  fmt :the format message to display if assertion fails
+   */
+  void (*isTrue)(int, const string, ...);
+  /**
+   * @brief Asserts the given condition is FALSE
+   * @param  condition :the condition to check
+   * @param  fmt :the format message to display if assertion fails
+   */
+  void (*isFalse)(int, const string, ...);
+  /**
+   * @brief Asserts that a pointer is NULL
+   * @param  ptr :the pointer to check
+   * @param  fmt :the format message to display if assertion fails
+   */
+  void (*isNull)(object, const string, ...);
+  /**
+   * @brief Asserts that a pointer is not NULL
+   * @param  ptr :the pointer to check
+   * @param  fmt :the format message to display if assertion fails
+   */
+  void (*isNotNull)(object, const string, ...);
+  /**
+   * @brief Asserts that two values are equal.
+   * @param expected :expected value.
+   * @param actual :actual value to compare.
+   * @param type :the value types
+   * @param fmt :format message to display if assertion fails.
+   */
+  void (*areEqual)(object, object, AssertType, const string, ...);
+  /**
+   * @brief Asserts that two values are not equal.
+   * @param expected :expected value.
+   * @param actual :actual value to compare.
+   * @param type :the value types
+   * @param fmt :format message to display if assertion fails.
+   */
+  void (*areNotEqual)(object, object, AssertType, const string, ...);
+  /**
+   * @brief Asserts that a float value is within a specified tolerance.
+   * @param value :the float value to check.
+   * @param min :the minimum tolerance value.
+   * @param max :the maximum tolerance value.
+   * @param fmt :format message to display if assertion fails.
+   */
+  void (*floatWithin)(float, float, float, const string, ...);
+  /**
+   * @brief Asserts that two strings are equal.
+   * @param expected :expected string.
+   * @param actual :actual string to compare.
+   * @param case_sensitive :case sensitivity flag.
+   * @param fmt :format message to display if assertion fails.
+   */
+  void (*stringEqual)(string, string, int, const string, ...);
+  /**
+   * @brief Assert throws an exception
+   * @param fmt :the format message to display if assertion fails
+   */
+  void (*throw)(const string, ...);
+  /**
+   * @brief Fails a testcase immediately and logs the message
+   * @param fmt :the format message to display
+   */
+  void (*fail)(const string, ...);
+  /**
+   * @brief Skips the testcase setting the state as skipped and logs the message
+   * @param fmt :the format message to display
+   */
+  void (*skip)(const string, ...);
 } IAssert;
 
 /**
@@ -166,56 +180,52 @@ extern const IAssert Assert;
  * @brief Test case structure
  * @detail Encapsulates the name of the test and the test case function pointer
  */
-typedef struct sigtest_case_s
-{
-	string name;
-	TestFunc test_func; /* Test function pointer */
-	int expect_fail;	/* Expect failure flag */
-	int expect_throw;	/* Expect throw flag */
-	struct
-	{
-		TestState state;
-		string message;
-	} test_result;
-	TestCase next; /* Pointer to the next test case */
-} sigtest_case_s;
+typedef struct st_case_s {
+  string name;
+  TestFunc test_func; /* Test function pointer */
+  int expect_fail;    /* Expect failure flag */
+  int expect_throw;   /* Expect throw flag */
+  struct {
+    TestState state;
+    string message;
+  } test_result;
+  TestCase next; /* Pointer to the next test case */
+} st_case_s;
 
 /**
  * @brief Logger structure for test set logging
  */
-typedef struct sigtest_logger_s
-{
-	void (*log)(const char *, ...);				  /* Logging function pointer */
-	void (*debug)(DebugLevel, const char *, ...); /* Debug logging function pointer */
-} sigtest_logger_s;
+typedef struct st_logger_s {
+  void (*log)(const char *, ...); /* Logging function pointer */
+  void (*debug)(DebugLevel, const char *,
+                ...); /* Debug logging function pointer */
+} st_logger_s;
 
 /**
  * @brief Test set structure for global setup and cleanup
  */
-typedef struct sigtest_set_s
-{
-	string name;		 /* Test set name */
-	CleanupFunc cleanup; /* Test set cleanup function */
-	CaseOp setup;		 /* Test case setup function */
-	CaseOp teardown;	 /* Test case teardown function */
-	FILE *log_stream;	 /* Log stream for the test set */
-	TestCase cases;		 /* Pointer to the test cases */
-	TestCase tail;		 /* Pointer to the last test case */
-	int count;			 /* Number of test cases */
-	int passed;			 /* Number of passed test cases */
-	int failed;			 /* Number of failed test cases */
-	int skipped;		 /* Number of skipped test cases */
-	TestCase current;	 /* Current test case */
-	TestSet next;		 /* Pointer to the next test set */
-	SigtestHooks hooks;	 /* Hooks for the test set */
-	Logger logger;		 /* Logger for the test set */
-} sigtest_set_s;
+typedef struct st_set_s {
+  string name;         /* Test set name */
+  CleanupFunc cleanup; /* Test set cleanup function */
+  CaseOp setup;        /* Test case setup function */
+  CaseOp teardown;     /* Test case teardown function */
+  FILE *log_stream;    /* Log stream for the test set */
+  TestCase cases;      /* Pointer to the test cases */
+  TestCase tail;       /* Pointer to the last test case */
+  int count;           /* Number of test cases */
+  int passed;          /* Number of passed test cases */
+  int failed;          /* Number of failed test cases */
+  int skipped;         /* Number of skipped test cases */
+  TestCase current;    /* Current test case */
+  TestSet next;        /* Pointer to the next test set */
+  ST_Hooks hooks;      /* Hooks for the test set */
+  Logger logger;       /* Logger for the test set */
+} st_set_s;
 
 /**
  * @brief Retrieve the SigmaTest version
  */
-const char *
-sigtest_version(void);
+const char *st_version(void);
 /**
  * @brief Registers a new test into the test array
  * @param  name :the test name
@@ -254,7 +264,12 @@ void testset(string name, void (*config)(FILE **), void (*cleanup)(void));
  * @brief Register test hooks
  * @param hooks :the test set hooks
  */
-void register_hooks(SigtestHooks);
+void register_hooks(ST_Hooks);
+/**
+ * @brief Get the current test context
+ * @param context :the test context object
+ */
+void test_context(object);
 
 /**
  * @brief Writes a formatted message to the current test set's log stream
@@ -263,7 +278,8 @@ void register_hooks(SigtestHooks);
  */
 void writef(const char *, ...);
 /**
- * @brief Writes a formatted message with newline to the current test set's log stream
+ * @brief Writes a formatted message with newline to the current test set's log
+ * stream
  * @param fmt :the format message to display
  * @param ... :the variable arguments for the format message
  */
@@ -293,33 +309,33 @@ void get_timestamp(char *, const char *);
 /**
  * @brief Test hooks structure
  */
-typedef struct sigtest_hooks_s
-{
-	const char *name;											   // Hooks label
-	void (*before_set)(const TestSet, object);					   // Called before each test set
-	void (*after_set)(const TestSet, object);					   // Called after each test set
-	void (*before_test)(object);								   // Called before each test case
-	void (*after_test)(object);									   // Called after each test case
-	void (*on_start_test)(object);								   // Callback at the start of a test
-	void (*on_end_test)(object);								   // Callback at the end of a test
-	void (*on_error)(const char *, object);						   // Callback on error
-	void (*on_test_result)(const TestSet, const TestCase, object); // Callback on test result
-	void *context;												   // User-defined data
-} sigtest_hooks_s;
+typedef struct st_hooks_s {
+  const char *name;                                              // Hooks label
+  void (*before_set)(const TestSet, object);                     // Called before each test set
+  void (*after_set)(const TestSet, object);                      // Called after each test set
+  void (*before_test)(object);                                   // Called before each test case
+  void (*after_test)(object);                                    // Called after each test case
+  void (*on_start_test)(object);                                 // Callback at the start of a test
+  void (*on_end_test)(object);                                   // Callback at the end of a test
+  void (*on_error)(const char *, object);                        // Callback on error
+  void (*on_test_result)(const TestSet, const TestCase, object); // Callback on test result
+  void (*on_memory_alloc)(size_t, object, object);               // Callback on memory allocated
+  void (*on_memory_free)(object, object);                        // Callback on memory freed
+  void *context;                                                 // User-defined data
+} st_hooks_s;
 /**
  * @brief Test hooks registry
  */
-typedef struct hook_registry_s
-{
-	SigtestHooks hooks;
-	struct hook_registry_s *next;
+typedef struct hook_registry_s {
+  ST_Hooks hooks;
+  struct hook_registry_s *next;
 } HookRegistry;
 /**
  * @brief Initialize default hooks with the specified output format
  * @param name :the desitred output format
  * @return pointer to the initialized SigtestHooks
  */
-SigtestHooks init_hooks(const char *);
+ST_Hooks init_hooks(const char *);
 
 /**
  * @brief Registers a test set with the given name
@@ -327,6 +343,15 @@ SigtestHooks init_hooks(const char *);
  * @param  hooks :the test runner hooks
  * @return 0 if all tests pass, 1 if any test fails
  */
-int run_tests(TestSet, SigtestHooks);
+int run_tests(TestSet, ST_Hooks);
 
-#endif // SIGTEST_H
+// prototype the Testrunner interface
+typedef struct ITestRunner {
+  void (*on_test_result)(const TestSet, const TestCase, object);
+  void (*on_start_test)(object);
+  void (*on_end_test)(object);
+  void (*before_test)(object);
+  void (*after_test)(object);
+} ITestRunner;
+
+extern const ITestRunner TestRunner;

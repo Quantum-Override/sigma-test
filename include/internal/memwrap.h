@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -21,32 +21,22 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  * ----------------------------------------------
- * File: json_hooks.h
- * Description: Header file for JSON output hooks for Sigma-Test
+ * File: memwrap.h
+ * Description: Header file for memory allocation wrappers
  */
-#ifndef JSON_HOOKS_H
-#define JSON_HOOKS_H
+#pragma once
 
-#include "sigtest.h"
+#include <stddef.h>
 
-struct JsonHookContext
-{
-   int count;
-   int verbose;
-   ts_time start;
-   ts_time end;
-   TestSet set;
-};
+// These are the REAL functions — called by our wrappers
+void *__real_malloc(size_t);
+void *__real_calloc(size_t, size_t);
+void *__real_realloc(void *, size_t);
+void __real_free(void *);
 
-extern struct st_hooks_s json_hooks;
+// Our wrappers — forward to the tracker (implemented in memcheck_hooks.c)
+void *__wrap_malloc(size_t);
+void *__wrap_calloc(size_t, size_t);
+void *__wrap_realloc(void *, size_t);
+void __wrap_free(void *);
 
-void json_before_set(const TestSet set, object context);
-void json_after_set(const TestSet set, object context);
-void json_before_test(object context);
-void json_after_test(object context);
-void json_on_start_test(object context);
-void json_on_end_test(object context);
-void json_on_error(const char *message, object context);
-void json_on_test_result(const TestSet set, const TestCase tc, object context);
-
-#endif // JSON_HOOKS_H

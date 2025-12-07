@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="hooks_set" timestamp="2025-12-06T12:00:51" hostname="badkraft-XPS-15-7590" tests="5" failures="2" skipped="1" time="0.000">
+">
+    <testcase name="JUnit: Should Pass" classname="hooks_set">
+    </testcase>
+    <testcase name="JUnit: Should Fail" classname="hooks_set">
+      <failure message="1 should not equal 0"/>
+    </testcase>
+    <testcase name="JUnit: Should Expect Fail" classname="hooks_set">
+    </testcase>
+    <testcase name="JUnit: Should Skip" classname="hooks_set">
+      <skipped/>
+    </testcase>
+    <testcase name="JUnit: Should Throw" classname="hooks_set">
+      <failure message="This test is explicitly thrown"/>
+    </testcase>
+  </testsuite>
+</testsuites>

@@ -119,7 +119,7 @@ void test_stringEqualsFail(void)
 __attribute__((constructor)) void init_sigtest_tests(void)
 {
 	testset("core_sigtest_set", set_config, NULL);
-	writelnf("Test Sigtest Log. Version %s", sigtest_version());
+	writelnf("Test Sigtest Log. Version %s", st_version());
 	writelnf("Test Source: %s", __FILE__);
 
 	testcase("assertTrue", test_True);

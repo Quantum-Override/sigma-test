@@ -2,5 +2,9 @@
    "files.associations": {
       "sigtest.h": "c",
       "sigtest_cli.h": "c"
+   },
+   "[c]": {
+      "editor.tabSize": 3,
+      "editor.insertSpaces": true
    }
 }
