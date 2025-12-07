@@ -265,6 +265,11 @@ void testset(string name, void (*config)(FILE **), void (*cleanup)(void));
  * @param hooks :the test set hooks
  */
 void register_hooks(ST_Hooks);
+/**
+ * @brief Get the current test context
+ * @param context :the test context object
+ */
+void test_context(object);
 
 /**
  * @brief Writes a formatted message to the current test set's log stream
