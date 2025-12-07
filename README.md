@@ -72,10 +72,38 @@ void register_tests(void)
 Available assertions:
 
 ```c
+// Asserts the given condition is TRUE
 Assert.isTrue(condition, "optional message");
+
+// Asserts the given condition is FALSE
 Assert.isFalse(condition, "optional message");
+
+// Asserts that a pointer is NULL
+Assert.isNull(ptr, "optional message");
+
+// Asserts that a pointer is not NULL
+Assert.isNotNull(ptr, "optional message");
+
+// Asserts that two values are equal
 Assert.areEqual(&expected, &actual, type, "optional message");
+
+// Asserts that two values are not equal
+Assert.areNotEqual(&expected, &actual, type, "optional message");
+
+// Asserts that a float value is within a specified tolerance
+Assert.floatWithin(value, min, max, "optional message");
+
+// Asserts that two strings are equal
+Assert.stringEqual(expected, actual, case_sensitive, "optional message");
+
+// Assert throws an exception (fails the test)
 Assert.throw("failure message");
+
+// Fails a testcase immediately and logs the message
+Assert.fail("failure message");
+
+// Skips the testcase and logs the message
+Assert.skip("skip message");
 ```
 
 Supported types for `areEqual`:  
