@@ -185,7 +185,7 @@ static char *xml_escape(const char *input) {
     }
   }
 
-  char *dst = malloc(needed + 1);
+  char *dst = __real_malloc(needed + 1);
   if (!dst)
     return NULL;
 

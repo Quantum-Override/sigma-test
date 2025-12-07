@@ -30,6 +30,7 @@
 #include <math.h>
 #include <setjmp.h>
 #include <stdarg.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> // 	for jmp_buf and related functions
@@ -69,6 +70,13 @@ static const char *DBG_LEVELS[] = {
 //	system clock structures
 #define SYS_CLOCK SYS_clock_gettime
 #define CLOCK_MONOTONIC 1
+
+static ST_Hooks current_hooks = {0};
+static atomic_size_t global_allocs = 0;
+static atomic_size_t global_frees = 0;
+size_t _sigtest_alloc_count = 0;
+size_t _sigtest_free_count = 0;
+
 int sys_gettime(ts_time *ts) {
   return clock_gettime(CLOCK_MONOTONIC, ts);
 }
@@ -78,6 +86,9 @@ double get_elapsed_ms(ts_time *start, ts_time *end) {
 //	internal logger declarations
 static void log_message(const char *, ...);
 static void log_debug(DebugLevel, const char *, ...);
+// internal clean up
+static void default_on_testcase_finish(void);
+static void default_on_testset_finished(void);
 // hooks registry
 static HookRegistry *hook_registry = NULL;
 
@@ -105,7 +116,7 @@ ST_Hooks init_hooks(const char *name) {
     }
   }
   // or create a new one
-  ST_Hooks hooks = malloc(sizeof(struct st_hooks_s));
+  ST_Hooks hooks = __real_malloc(sizeof(struct st_hooks_s));
   if (!hooks) {
     fwritelnf(stderr, "Error: Failed to allocate memory for hooks");
     return NULL; // Memory allocation failed
@@ -113,7 +124,7 @@ ST_Hooks init_hooks(const char *name) {
   hooks->name = strdup(name);
   if (!hooks->name) {
     fwritelnf(stderr, "Error: Failed to duplicate hook name");
-    free(hooks);
+    __real_free(hooks);
     return NULL; // Memory allocation failed
   }
   *hooks = (struct st_hooks_s){
@@ -126,6 +137,8 @@ ST_Hooks init_hooks(const char *name) {
       .on_end_test = NULL,
       .on_error = NULL,
       .on_test_result = NULL,
+      .on_memory_alloc = NULL,
+      .on_memory_free = NULL,
       .context = NULL,
   };
 
@@ -139,30 +152,30 @@ static void cleanup_test_runner(void) {
   TestSet set = test_sets;
   while (set) {
     TestSet next = set->next;
-    // free test cases
+    // __real_free test cases
     TestCase tc = set->cases;
     while (tc) {
       TestCase next_tc = tc->next;
-      free(tc->name);
+      __real_free(tc->name);
       if (tc->test_result.message)
-        free(tc->test_result.message);
+        __real_free(tc->test_result.message);
 
-      free(tc);
+      __real_free(tc);
       tc = next_tc;
     }
 
-    // free test set
-    free(set->name);
+    // __real_free test set
+    __real_free(set->name);
     if (set->log_stream != stdout && set->log_stream) {
       fclose(set->log_stream);
       set->log_stream = NULL;
     }
 
-    free(set);
+    __real_free(set);
     set = next;
   }
   if (current_set && current_set->logger)
-    free(current_set->logger);
+    __real_free(current_set->logger);
 
   // Reset the test set registry
   test_sets = NULL;
@@ -235,13 +248,25 @@ void set_test_context(TestState result, const string message) {
   if (current_set && current_set->current) {
     current_set->current->test_result.state = result;
     if (current_set->current->test_result.message) {
-      free(current_set->current->test_result.message);
+      __real_free(current_set->current->test_result.message);
     }
     current_set->current->test_result.message = message ? strdup(message) : NULL;
     if (result != PASS) {
       // Stop assertions for this test
       longjmp(jmpbuffer, 1);
     }
+  }
+}
+
+void test_context(object ctx) {
+  struct ctx {
+    FILE *log_stream;
+  } *context = ctx;
+
+  if (current_set) {
+    context->log_stream = current_set->log_stream;
+  } else {
+    context->log_stream = stdout;
   }
 }
 
@@ -547,6 +572,29 @@ static void assert_skip(const string fmt, ...) {
 }
 
 /*
+        Memory wrappers
+*/
+void *__wrap_malloc(size_t s) {
+  void *p = __real_malloc(s);
+  if (p) {
+    atomic_fetch_add(&global_allocs, 1);
+    if (current_hooks && current_hooks->on_memory_alloc) {
+      current_hooks->on_memory_alloc(s, p, current_hooks->context);
+    }
+  }
+  return p;
+}
+void __wrap_free(void *p) {
+  if (p) {
+    atomic_fetch_add(&global_frees, 1);
+    if (current_hooks && current_hooks->on_memory_free) {
+      current_hooks->on_memory_free(p, current_hooks->context);
+    }
+  }
+  __real_free(p);
+}
+
+/*
         IAssert interface
 */
 const IAssert Assert = {
@@ -577,7 +625,7 @@ void testset(string name, ConfigFunc config, CleanupFunc cleanup) {
     atexit_registered = 1;
   }
 
-  TestSet set = malloc(sizeof(struct st_set_s));
+  TestSet set = __real_malloc(sizeof(struct st_set_s));
   if (!set) {
     fwritelnf(stdout, "Failed to allocate memory for test set\n");
     exit(EXIT_FAILURE);
@@ -595,10 +643,10 @@ void testset(string name, ConfigFunc config, CleanupFunc cleanup) {
   set->skipped = 0;
   set->current = NULL;
   set->next = test_sets;
-  set->logger = malloc(sizeof(struct st_logger_s));
+  set->logger = __real_malloc(sizeof(struct st_logger_s));
   if (!set->logger) {
     fwritelnf(stdout, "Failed to allocate memory for test set logger\n");
-    free(set);
+    __real_free(set);
     exit(EXIT_FAILURE);
   }
 
@@ -624,7 +672,7 @@ void testset(string name, ConfigFunc config, CleanupFunc cleanup) {
   if (!set->name) {
     if (set->log_stream != stdout && set->log_stream)
       fclose(set->log_stream);
-    free(set);
+    __real_free(set);
     writelnf("Failed to allocate memory for test set name\n");
     exit(EXIT_FAILURE);
   }
@@ -640,7 +688,7 @@ void testcase(string name, TestFunc func) {
     testset("default", NULL, NULL);
   }
 
-  TestCase tc = malloc(sizeof(struct st_case_s));
+  TestCase tc = __real_malloc(sizeof(struct st_case_s));
   if (!tc) {
     writef("Failed to allocate memory for test case `%s`\n", name);
     exit(EXIT_FAILURE);
@@ -648,7 +696,7 @@ void testcase(string name, TestFunc func) {
   tc->name = strdup(name);
   if (!tc->name) {
     writef("Failed to allocate memory for test case name `%s`\n", name);
-    free(tc);
+    __real_free(tc);
 
     exit(EXIT_FAILURE); // cleanup_test_sets will handle freeing
   }
@@ -677,7 +725,7 @@ void fail_testcase(string name, void (*func)(void)) {
     testset("default", NULL, NULL);
   }
 
-  TestCase tc = malloc(sizeof(struct st_case_s));
+  TestCase tc = __real_malloc(sizeof(struct st_case_s));
   if (!tc) {
     writef("Failed to allocate memory for test case `%s`\n", name);
     exit(EXIT_FAILURE);
@@ -685,7 +733,7 @@ void fail_testcase(string name, void (*func)(void)) {
   tc->name = strdup(name);
   if (!tc->name) {
     writef("Failed to allocate memory for test case name `%s`\n", name);
-    free(tc);
+    __real_free(tc);
 
     exit(EXIT_FAILURE); // cleanup_test_sets will handle freeing
   }
@@ -714,7 +762,7 @@ void testcase_throws(string name, void (*func)(void)) {
     testset("default", NULL, NULL);
   }
 
-  TestCase tc = malloc(sizeof(struct st_case_s));
+  TestCase tc = __real_malloc(sizeof(struct st_case_s));
   if (!tc) {
     writef("Failed to allocate memory for test case `%s`\n", name);
     exit(EXIT_FAILURE);
@@ -722,7 +770,7 @@ void testcase_throws(string name, void (*func)(void)) {
   tc->name = strdup(name);
   if (!tc->name) {
     writef("Failed to allocate memory for test case name `%s`\n", name);
-    free(tc);
+    __real_free(tc);
 
     exit(EXIT_FAILURE); // cleanup_test_sets will handle freeing
   }
@@ -763,7 +811,7 @@ void teardown_testcase(CaseOp teardown) {
         Register test hooks
 */
 void register_hooks(ST_Hooks hooks) {
-  HookRegistry *entry = malloc(sizeof(HookRegistry));
+  HookRegistry *entry = __real_malloc(sizeof(HookRegistry));
   if (!entry) {
     fwritelnf(stderr, "Error: Failed to allocate hook registry entry");
     return; // Memory allocation failed
@@ -886,7 +934,31 @@ static void default_on_error(const char *message, object context) {
     current_set->logger->log("Error in test [%s]: %s\n", current_set->current->name, message);
   }
 }
+static void default_on_testcase_finish(void) {
+  //  total up atomic allocation counts
+  _sigtest_alloc_count += atomic_load(&global_allocs);
+  _sigtest_free_count += atomic_load(&global_frees);
+  // reset atomic allocation counters
+  atomic_store(&global_allocs, 0);
+  atomic_store(&global_frees, 0);
+}
+static void default_on_testset_finished(void) {
+  //  get the atomic allocation counts
 
+  size_t leaks = (_sigtest_alloc_count > _sigtest_free_count)
+                     ? (_sigtest_alloc_count - _sigtest_free_count)
+                     : 0;
+  fwritelnf(current_set->log_stream, "\n===== Memory Allocations Report =================================");
+  if (leaks > 0) {
+    fwritelnf(current_set->log_stream, "WWARNING: MEMORY LEAK — %zu unfreed allocation(s)", leaks);
+  } else if (_sigtest_alloc_count > 0) {
+    fwritelnf(current_set->log_stream, "Memory clean — all %zu allocations freed.\n\n",
+              _sigtest_alloc_count);
+  }
+
+  fwritelnf(current_set->log_stream, "  Total mallocs:                %zu", _sigtest_alloc_count);
+  fwritelnf(current_set->log_stream, "  Total frees:                  %zu", _sigtest_free_count);
+}
 static struct
 {
   int count;
@@ -904,10 +976,12 @@ static const st_hooks_s default_hooks = {
     .after_test = default_after_test,
     .on_error = default_on_error,
     .on_test_result = default_on_test_result,
-    .context = &default_ctx};
+    .context = &default_ctx,
+};
+
 //	 initialize on start up
 __attribute__((constructor)) static void init_default_hooks(void) {
-  HookRegistry *entry = malloc(sizeof(HookRegistry));
+  HookRegistry *entry = __real_malloc(sizeof(HookRegistry));
   // if we don't have a valid hooks registry, we exit
   if (!entry) {
     fwritelnf(stderr, "Error: Failed to allocate hooks registry entry");
@@ -960,6 +1034,7 @@ int run_tests(TestSet sets, ST_Hooks test_hooks) {
       hooks = set->hooks;
     }
 
+    current_hooks = hooks; // Makes MemCheck callbacks fire
     total_sets++;
   }
   if (total_sets == 0) {
@@ -1020,36 +1095,37 @@ int run_tests(TestSet sets, ST_Hooks test_hooks) {
       if (hooks && hooks->after_test) {
         hooks->after_test(hooks->context);
       }
+      default_on_testcase_finish();
 
-      // process test result
+      // process FAIL test result
       if (tc->expect_fail) {
         if (tc->test_result.state == FAIL) {
           tc->test_result.state = PASS;
           if (tc->test_result.message) {
-            free(tc->test_result.message);
+            __real_free(tc->test_result.message);
             tc->test_result.message = strdup("Expected failure occurred");
           }
         } else if (tc->test_result.state != SKIP) {
           tc->test_result.state = FAIL;
           if (tc->test_result.message)
-            free(tc->test_result.message);
+            __real_free(tc->test_result.message);
           tc->test_result.message = strdup("Expected failure but passed");
         }
       } else if (tc->expect_throw) {
         if (tc->test_result.state == FAIL) {
           tc->test_result.state = PASS;
           if (tc->test_result.message) {
-            free(tc->test_result.message);
+            __real_free(tc->test_result.message);
             tc->test_result.message = strdup("Expected throw occurred");
           }
         } else if (tc->test_result.state != SKIP) {
           tc->test_result.state = FAIL;
           if (tc->test_result.message)
-            free(tc->test_result.message);
+            __real_free(tc->test_result.message);
           tc->test_result.message = strdup("Expected throw but passed");
         }
       }
-      //	process test result
+      //	process PASS/SKIP result
       if (tc->test_result.state == PASS) {
         if (hooks && hooks->on_test_result) {
           hooks->on_test_result(set, tc, hooks->context);
@@ -1082,15 +1158,16 @@ int run_tests(TestSet sets, ST_Hooks test_hooks) {
     // Call after_set hook if defined
     if (hooks && hooks->after_set) {
       hooks->after_set(set, hooks->context);
-    } else {
-      fwritelnf(set->log_stream, "=================================================================");
-      fwritelnf(set->log_stream, "[%d]     TESTS=%3d        PASS=%3d        FAIL=%3d        SKIP=%3d",
-                set_sequence, tc_total, tc_passed, tc_failed, tc_skipped);
     }
+    fwritelnf(set->log_stream, "=================================================================");
+    fwritelnf(set->log_stream, "[%d]     TESTS=%3d        PASS=%3d        FAIL=%3d        SKIP=%3d",
+              set_sequence, tc_total, tc_passed, tc_failed, tc_skipped);
 
     if (set->cleanup) {
       set->cleanup();
     }
+
+    default_on_testset_finished();
   }
 
   // Final output to stdout
@@ -1172,3 +1249,12 @@ void fwritelnf(FILE *stream, const char *fmt, ...) {
 
   va_end(args);
 }
+
+// Public global ITestRunner instance
+const ITestRunner TestRunner = {
+    .on_test_result = default_on_test_result,
+    .on_start_test = default_on_start_test,
+    .on_end_test = default_on_end_test,
+    .before_test = default_before_test,
+    .after_test = default_after_test,
+};

@@ -24,13 +24,13 @@
  * File: sigtest.h
  * Description: Header file for Sigma-Test core definitions and interfaces
  */
-#ifndef SIGTEST_H
-#define SIGTEST_H
+#pragma once
 
+#include "internal/memwrap.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <time.h>
-// -----
+
 #include <sys/syscall.h>
 #include <unistd.h>
 
@@ -305,17 +305,18 @@ void get_timestamp(char *, const char *);
  * @brief Test hooks structure
  */
 typedef struct st_hooks_s {
-  const char *name;                          // Hooks label
-  void (*before_set)(const TestSet, object); // Called before each test set
-  void (*after_set)(const TestSet, object);  // Called after each test set
-  void (*before_test)(object);               // Called before each test case
-  void (*after_test)(object);                // Called after each test case
-  void (*on_start_test)(object);             // Callback at the start of a test
-  void (*on_end_test)(object);               // Callback at the end of a test
-  void (*on_error)(const char *, object);    // Callback on error
-  void (*on_test_result)(const TestSet, const TestCase,
-                         object); // Callback on test result
-  void *context;                  // User-defined data
+  const char *name;                                              // Hooks label
+  void (*before_set)(const TestSet, object);                     // Called before each test set
+  void (*after_set)(const TestSet, object);                      // Called after each test set
+  void (*before_test)(object);                                   // Called before each test case
+  void (*after_test)(object);                                    // Called after each test case
+  void (*on_start_test)(object);                                 // Callback at the start of a test
+  void (*on_end_test)(object);                                   // Callback at the end of a test
+  void (*on_error)(const char *, object);                        // Callback on error
+  void (*on_test_result)(const TestSet, const TestCase, object); // Callback on test result
+  void (*on_memory_alloc)(size_t, object, object);               // Callback on memory allocated
+  void (*on_memory_free)(object, object);                        // Callback on memory freed
+  void *context;                                                 // User-defined data
 } st_hooks_s;
 /**
  * @brief Test hooks registry
@@ -339,4 +340,13 @@ ST_Hooks init_hooks(const char *);
  */
 int run_tests(TestSet, ST_Hooks);
 
-#endif // SIGTEST_H
+// prototype the Testrunner interface
+typedef struct ITestRunner {
+  void (*on_test_result)(const TestSet, const TestCase, object);
+  void (*on_start_test)(object);
+  void (*on_end_test)(object);
+  void (*before_test)(object);
+  void (*after_test)(object);
+} ITestRunner;
+
+extern const ITestRunner TestRunner;

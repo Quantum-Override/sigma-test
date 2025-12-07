@@ -5,9 +5,11 @@
 
 CC = gcc
 CFLAGS = -Wall -g -fPIC -I$(INCLUDE_DIR)
-LDFLAGS = -shared
 TST_CFLAGS = $(CFLAGS) -DSIGTEST_TEST
-TST_LDFLAGS = -g
+TST_CFLAGS += -Wno-unused-result  # Suppress "ignoring return value of 'malloc'"
+WRAP_LDFLAGS = -Wl,--wrap=malloc -Wl,--wrap=free -Wl,--wrap=calloc -Wl,--wrap=realloc
+LDFLAGS = -shared $(WRAP_LDFLAGS)
+TST_LDFLAGS = -g $(WRAP_LDFLAGS)
 
 # Directories
 SRC_DIR       = src
