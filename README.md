@@ -214,7 +214,7 @@ Running: Assert Skip Test Case                   0.165 us  [SKIP]
 
 SigmaTest includes **built-in, zero-config memory leak detection** — because in C, **memory safety is not optional**.
 
-Every `malloc`, `calloc`, `realloc`, and `free` in your tests is tracked — globally and automatically.
+Add: `WRAP_LDFLAGS = -Wl,--wrap=malloc -Wl,--wrap=free -Wl,--wrap=calloc -Wl,--wrap=realloc` to your linker flags ... then every `malloc`, `calloc`, `realloc`, and `free` in your tests and test dependencies are tracked — globally and automatically.
 
 At the end of every test run, you get a **Memory Allocations Report**:
 
@@ -226,7 +226,7 @@ WARNING: MEMORY LEAK — 1 unfreed allocation(s)
 =================================================================
 ```
 
-- **No setup required**  
+- **No setup required** (other than LDFLAGS) 
 - **No hooks needed**  
 - **No Valgrind**  
 - **No excuses**
