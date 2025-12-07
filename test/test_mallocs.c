@@ -21,7 +21,7 @@ static void test_basic_clean_run(void) {
 
 __attribute__((constructor)) void init_memory_tests(void) {
   // we could add a feature later to throw on leaks, but for now just log them
-  testset("Memory Checks Suite", set_config, NULL);
+  testset("Memory Allocations Report", set_config, NULL);
 
   // Basic always-on checks
   testcase("Basic: Global leak detection", test_basic_global_leak_detection);
