@@ -1,3 +1,4 @@
 BasedOnStyle: LLVM
 BreakBeforeBraces: Attach
 ColumnLimit: 0
+IndentWidth: 3

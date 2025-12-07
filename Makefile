@@ -45,7 +45,7 @@ $(BUILD_DIR)/hooks $(TST_BUILD_DIR) $(LIB_DIR) $(BIN_DIR):
 # Library objects (with -fPIC for shared library)
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(HEADER) | $(BUILD_DIR)
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(TST_CFLAGS) -c $< -o $@
 
 # Test objects (with test flags)
 $(TST_BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(HEADER) | $(TST_BUILD_DIR)
@@ -53,7 +53,7 @@ $(TST_BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(HEADER) | $(TST_BUILD_DIR)
 
 # === Compile CLI ===
 $(CLI_OBJ): $(CLI_SRC) $(HEADER) | $(BUILD_DIR)
-	$(CC) $(TST_CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 # === Hook objects (built on demand) ===
 $(BUILD_DIR)/hooks/%.o: $(SRC_DIR)/hooks/%.c $(HEADER) | $(BUILD_DIR)/hooks
