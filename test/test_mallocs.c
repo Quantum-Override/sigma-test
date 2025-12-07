@@ -31,7 +31,7 @@ __attribute__((constructor)) void init_memory_tests(void) {
      Reports at the end of each test set ...
 
       ===== Memory Allocations Report =================================
-        WWARNING: MEMORY LEAK — 1 unfreed allocation(s)
+        WARNING: MEMORY LEAK — 1 unfreed allocation(s)
           Total mallocs:                1
           Total frees:                  0
   */

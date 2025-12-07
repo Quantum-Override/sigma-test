@@ -950,7 +950,7 @@ static void default_on_testset_finished(void) {
                      : 0;
   fwritelnf(current_set->log_stream, "\n===== Memory Allocations Report =================================");
   if (leaks > 0) {
-    fwritelnf(current_set->log_stream, "WWARNING: MEMORY LEAK — %zu unfreed allocation(s)", leaks);
+    fwritelnf(current_set->log_stream, "WARNING: MEMORY LEAK — %zu unfreed allocation(s)", leaks);
   } else if (_sigtest_alloc_count > 0) {
     fwritelnf(current_set->log_stream, "Memory clean — all %zu allocations freed.\n\n",
               _sigtest_alloc_count);
