@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="hooks_set" timestamp="2025-12-06T12:00:51" hostname="badkraft-XPS-15-7590" tests="5" failures="2" skipped="1" time="0.000">
+  <testsuite name="hooks_set" timestamp="2025-12-21T06:22:15" hostname="badkraft-XPS-15-7590" tests="5" failures="2" skipped="1" time="0.000">
 ">
     <testcase name="JUnit: Should Pass" classname="hooks_set">
     </testcase>
@@ -17,3 +17,9 @@
     </testcase>
   </testsuite>
 </testsuites>
+=================================================================
+[1]     TESTS=  5        PASS=  2        FAIL=  2        SKIP=  1
+
+===== Memory Allocations Report =================================
+  Total mallocs:                0
+  Total frees:                  1

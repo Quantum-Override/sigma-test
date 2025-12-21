@@ -1,25 +1,23 @@
 Test Source: test/test_asserts.c
-[1] asserts_set              :  13 :         2025-12-13  11:45:28
+[1] asserts_set              :  13 :         2025-12-21  06:11:49
 =================================================================
-Running: Assert Is Null                          0.246 us  [PASS]
-Running: Assert Is Not Null                      0.254 us  [PASS]
-Running: Assert Int Not Equal                    0.137 us  [PASS]
-Running: Assert Float Not Equal                < 0.1 us  [PASS]
-Running: Assert Strings Not Comparable           0.373 us  [PASS]
-Running: Assert Float Within                   < 0.1 us  [PASS]
-Running: Assert Float Not Within                 0.795 us  [PASS]
-Running: Assert String Equal                     0.165 us  [PASS]
-Running: Assert String Not Equal                 0.784 us  [PASS]
-Running: Assert String Case Insensitive        < 0.1 us  [PASS]
-Running: Assert String Case Sensitive            0.510 us  [PASS]
-Running: Assert Fail Test Case                   0.184 us  [PASS]
-Running: Assert Skip Test Case                   0.158 us  [SKIP]
+Running: Assert Is Null                          0.214 µs  [PASS]
+Running: Assert Is Not Null                      0.250 µs  [PASS]
+Running: Assert Int Not Equal                    0.133 µs  [PASS]
+Running: Assert Float Not Equal                  0.104 µs  [PASS]
+Running: Assert Strings Not Comparable           0.298 µs  [PASS]
+Running: Assert Float Within                   < 0.1   µs  [PASS]
+Running: Assert Float Not Within                 0.781 µs  [PASS]
+Running: Assert String Equal                     0.152 µs  [PASS]
+Running: Assert String Not Equal                 0.776 µs  [PASS]
+Running: Assert String Case Insensitive        < 0.1   µs  [PASS]
+Running: Assert String Case Sensitive            0.535 µs  [PASS]
+Running: Assert Fail Test Case                   0.181 µs  [PASS]
+Running: Assert Skip Test Case                   0.159 µs  [SKIP]
 =================================================================
 [1]     TESTS= 13        PASS= 12        FAIL=  0        SKIP=  1
 
 ===== Memory Allocations Report =================================
 Memory clean — all 1 allocations freed.
-
-
   Total mallocs:                1
   Total frees:                  1
