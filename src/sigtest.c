@@ -969,7 +969,25 @@ int main(void) {
 }
 #endif // SIGTEST_TEST
 
-static void runner_init(TestSet, ST_Hooks, int *, int *, ST_Hooks *);
+static RunnerState runner_init(TestSet, ST_Hooks, int *, int *, ST_Hooks *);
+static RunnerState set_loop(TestSet *, int *);
+static RunnerState set_init(TestSet, int *, int *, int *, int *, TestSet *);
+static RunnerState before_set(ST_Hooks, int, TestSet, char *);
+static RunnerState case_loop(TestCase *);
+static RunnerState case_init(TestCase, TestSet);
+static RunnerState before_test(ST_Hooks);
+static RunnerState setup_test(TestSet);
+static RunnerState start_test(ST_Hooks);
+static RunnerState execute_test(TestCase, jmp_buf);
+static RunnerState end_test(ST_Hooks);
+static RunnerState teardown_test(TestSet);
+static RunnerState after_test(ST_Hooks);
+static RunnerState process_result(TestCase, TestSet, ST_Hooks,
+                                  int *, int *, int *, int *, int *);
+static RunnerState after_set(ST_Hooks, TestSet,
+                             int, int, int, int, int);
+static void runner_summary(int, int, TestSet);
+static int runner_done(TestSet);
 
 // the actual test runner
 int run_tests(TestSet sets, ST_Hooks test_hooks) {
@@ -980,97 +998,231 @@ int run_tests(TestSet sets, ST_Hooks test_hooks) {
    int total_sets = 0;
    ST_Hooks hooks = NULL;
 
-   runner_init(sets, test_hooks, &total_tests, &total_sets, &hooks);
-
-   if (total_sets == 0) {
-      return 0;
-   }
-
-   // for (TestSet set = sets; set; set = set->next, set_sequence++) {
-   //  VIRTUAL STATE: SET_LOOP (explicit first entry)
    TestSet current_set_iter = sets;
-   goto set_loop;
+   TestCase current_tc_iter = NULL;
+   current_set = NULL;
+   TestCase tc = NULL;
 
-set_loop:
-   if (!current_set_iter) {
-      goto runner_summary;
+   int tc_total = 0;
+   int tc_passed = 0;
+   int tc_failed = 0;
+   int tc_skipped = 0;
+
+   RunnerState state = RUNNER_INIT;
+   while (state != RUNNER_DONE) {
+      switch (state) {
+      case RUNNER_INIT:
+         state = runner_init(sets, test_hooks, &total_tests, &total_sets, &hooks);
+
+         break;
+      case SET_LOOP:
+         state = set_loop(&current_set_iter, &set_sequence);
+         if (state == RUNNER_SUMMARY) {
+            break;
+         }
+         current_set = current_set_iter;
+         state = SET_INIT;
+
+         break;
+      case SET_INIT:
+         state = set_init(current_set_iter, &tc_total, &tc_passed, &tc_failed, &tc_skipped, &current_set);
+
+         break;
+      case BEFORE_SET:
+         state = before_set(hooks, set_sequence, current_set, timestamp);
+         current_tc_iter = current_set->cases;
+         state = CASE_LOOP;
+
+         break;
+      case CASE_LOOP:
+         state = case_loop(&current_tc_iter);
+
+         break;
+      case CASE_INIT:
+         tc = current_tc_iter;
+         state = case_init(tc, current_set);
+
+         break;
+      case BEFORE_TEST:
+         state = before_test(hooks);
+
+         break;
+      case SETUP_TEST:
+         state = setup_test(current_set);
+
+         break;
+      case START_TEST:
+         state = start_test(hooks);
+
+         break;
+      case EXECUTE_TEST:
+         state = execute_test(tc, jmpbuffer);
+
+         break;
+      case END_TEST:
+         state = end_test(hooks);
+
+         break;
+      case TEARDOWN_TEST:
+         state = teardown_test(current_set);
+
+         break;
+      case AFTER_TEST:
+         state = after_test(hooks);
+         default_on_testcase_finish();
+
+         break;
+      case PROCESS_RESULT:
+         state = process_result(tc, current_set, hooks,
+                                &tc_passed, &tc_failed, &tc_skipped,
+                                &tc_total, &total_tests);
+         current_tc_iter = current_tc_iter->next;
+
+         break;
+      case AFTER_SET:
+         state = after_set(hooks, current_set,
+                           tc_total, tc_passed, tc_failed, tc_skipped,
+                           total_tests);
+         current_set_iter = current_set_iter->next;
+
+         break;
+      case RUNNER_SUMMARY:
+         runner_summary(total_tests, total_sets, sets);
+         state = RUNNER_DONE;
+
+         break;
+      case RUNNER_DONE:
+         break;
+      default:
+         fwritelnf(stderr, "Error: Unknown runner state %d", state);
+         state = RUNNER_DONE;
+         break;
+      }
    }
 
-   // VIRTUAL STATE: SET_INIT
+   return runner_done(sets);
+}
+// State handlers:
+static RunnerState runner_init(TestSet sets, ST_Hooks test_hooks, int *total_tests_out, int *total_sets_out, ST_Hooks *hooks_out) {
+   // NOTE: we are not counting tests here; present for consistency
+   (void)total_tests_out;
+
+   int total_sets = 0;
+   ST_Hooks hooks = NULL;
+
+   for (TestSet set = sets; set; set = set->next) {
+      total_sets++;
+
+      if (!test_hooks && !set->hooks) {
+         if (hook_registry && hook_registry->hooks) {
+            hooks = hook_registry->hooks;
+         }
+      } else if (test_hooks) {
+         hooks = test_hooks;
+      } else if (set->hooks) {
+         hooks = set->hooks;
+      }
+
+      current_hooks = hooks;
+   }
+
+   *total_sets_out = total_sets;
+   *hooks_out = hooks;
+
+   return SET_LOOP;
+}
+static RunnerState set_loop(TestSet *set_iter, int *sequence_out) {
+   if (!*set_iter) {
+      return RUNNER_SUMMARY;
+   }
+
+   (*sequence_out)++;
+   return SET_INIT;
+}
+static RunnerState set_init(TestSet current_set_iter, int *tc_total_out, int *tc_passed_out, int *tc_failed_out, int *tc_skipped_out, TestSet *current) {
    TestSet set = current_set_iter;
-   int tc_total = 0, tc_passed = 0, tc_failed = 0, tc_skipped = 0;
+   *tc_total_out = 0;
+   *tc_passed_out = 0;
+   *tc_failed_out = 0;
+   *tc_skipped_out = 0;
+
    if (!set->log_stream || !set->logger) {
       set->log_stream = stdout;
    }
    // Set current_set to the executing set for writef/debugf
-   current_set = set;
+   *current = set;
 
-   // VIRTUAL STATE: BEFORE_SET
+   return BEFORE_SET;
+}
+static RunnerState before_set(ST_Hooks hooks, int set_sequence, TestSet current, char *timestamp) {
    if (hooks && hooks->before_set) {
-      hooks->before_set(set, hooks->context);
+      hooks->before_set(current, hooks->context);
    } else {
       get_timestamp(timestamp, "%Y-%m-%d  %H:%M:%S");
-      fwritelnf(set->log_stream, "[%d] %-25s:%4d %-10s%s",
-                set_sequence, set->name, set->count, ":", timestamp);
-      fwritelnf(set->log_stream, "=================================================================");
+      fwritelnf(current->log_stream, "[%d] %-25s:%4d %-10s%s",
+                set_sequence, current->name, current->count, ":", timestamp);
+      fwritelnf(current->log_stream, "=================================================================");
    }
 
-   // for (TestCase tc = set->cases; tc; tc = tc->next) {
-   //  VIRTUAL STATE: CASE_LOOP (explicit first entry)
-   TestCase current_tc_iter = set->cases;
-   goto case_loop;
-
-case_loop:
-   if (!current_tc_iter) {
-      goto after_set;
+   return CASE_LOOP;
+}
+static RunnerState case_loop(TestCase *tc_iter) {
+   if (!*tc_iter) {
+      return AFTER_SET;
    }
-
-   // VIRTUAL STATE: CASE_INIT
-   TestCase tc = current_tc_iter;
+   return CASE_INIT;
+}
+static RunnerState case_init(TestCase tc, TestSet set) {
    set->current = tc; // Set current test for set_test_context
-
-   // VIRTUAL STATE: BEFORE_TEST
+   return BEFORE_TEST;
+}
+static RunnerState before_test(ST_Hooks hooks) {
    if (hooks && hooks->before_test) {
       hooks->before_test(hooks->context);
    }
-
-   //	VIRTUAL STATE: SETUP_TEST
+   return SETUP_TEST;
+}
+static RunnerState setup_test(TestSet set) {
    if (set->setup) {
       set->setup();
    }
-
-   // VIRTUAL STATE: START_TEST
+   return START_TEST;
+}
+static RunnerState start_test(ST_Hooks hooks) {
    if (hooks && hooks->on_start_test) {
       hooks->on_start_test(hooks->context);
    }
-
-   //	VIRTUAL STATE: EXECUTE_TEST
+   return EXECUTE_TEST;
+}
+static RunnerState execute_test(TestCase tc, jmp_buf jmpbuffer) {
    if (setjmp(jmpbuffer) == 0) {
       tc->test_func();
-      goto end_test;
    } else {
-      // VIRTUAL STATE: HANDLE_EXECPTION
-      // future feature ... ???
+      // handle exception
    }
-
-   // VIRTUAL STATE: END_TEST
-end_test:
+   return END_TEST;
+}
+static RunnerState end_test(ST_Hooks hooks) {
    if (hooks && hooks->on_end_test) {
       hooks->on_end_test(hooks->context);
    }
-
-   //	VIRTUAL STATE: TEARDOWN_TEST
+   return TEARDOWN_TEST;
+}
+static RunnerState teardown_test(TestSet set) {
    if (set->teardown) {
-      set->logger->log("Running teardown");
       set->teardown();
    }
-
-   //	VIRTUAL STATE: AFTER_TEST
+   return AFTER_TEST;
+}
+static RunnerState after_test(ST_Hooks hooks) {
    if (hooks && hooks->after_test) {
       hooks->after_test(hooks->context);
    }
-   default_on_testcase_finish();
-
+   return PROCESS_RESULT;
+}
+static RunnerState process_result(TestCase tc, TestSet set, ST_Hooks hooks,
+                                  int *tc_passed, int *tc_failed, int *tc_skipped,
+                                  int *tc_total, int *total_tests) {
    // VIRTUAL STATE: PROCESS_RESULT
    if (tc->expect_fail) {
       if (tc->test_result.state == FAIL) {
@@ -1099,14 +1251,14 @@ end_test:
          tc->test_result.message = strdup("Expected throw but passed");
       }
    }
-   //	process PASS/SKIP result
+
    if (tc->test_result.state == PASS) {
       if (hooks && hooks->on_test_result) {
          hooks->on_test_result(set, tc, hooks->context);
       } else {
          set->logger->log("[PASS]\n");
       }
-      tc_passed++;
+      (*tc_passed)++;
       set->passed++;
    } else if (tc->test_result.state == SKIP) {
       if (hooks && hooks->on_test_result) {
@@ -1114,7 +1266,7 @@ end_test:
       } else {
          set->logger->log("[SKIP]\n");
       }
-      tc_skipped++;
+      (*tc_skipped)++;
       set->skipped++;
    } else {
       if (hooks && hooks->on_test_result) {
@@ -1122,76 +1274,39 @@ end_test:
       } else {
          set->logger->log("[FAIL]\n     %s", tc->test_result.message ? tc->test_result.message : "Unknown");
       }
-      tc_failed++;
+      (*tc_failed)++;
       set->failed++;
    }
-   tc_total++;
-   total_tests++;
-   set->current = NULL;
 
-   // advance to next test case
-   current_tc_iter = current_tc_iter->next;
-   goto case_loop;
-//}
+   (*tc_total)++;
+   (*total_tests)++;
 
-// VIRTUAL STATE: AFTER_SET
-after_set:
+   return CASE_LOOP;
+}
+static RunnerState after_set(ST_Hooks hooks, TestSet set,
+                             int sequence, int tc_total, int tc_passed, int tc_failed, int tc_skipped) {
    if (hooks && hooks->after_set) {
-      hooks->after_set(set, hooks->context);
+      hooks->after_set(current_set, hooks->context);
    }
-   fwritelnf(set->log_stream, "=================================================================");
-   fwritelnf(set->log_stream, "[%d]     TESTS=%3d        PASS=%3d        FAIL=%3d        SKIP=%3d",
-             set_sequence, tc_total, tc_passed, tc_failed, tc_skipped);
-
-   if (set->cleanup) {
-      set->cleanup();
-   }
+   fwritelnf(current_set->log_stream, "=================================================================");
+   fwritelnf(current_set->log_stream, "[%d]     TESTS=%3d        PASS=%3d        FAIL=%3d        SKIP=%3d",
+             sequence, tc_total, tc_passed, tc_failed, tc_skipped);
 
    default_on_testset_finished();
-   //}
-   // advance to next set
-   current_set_iter = current_set_iter->next;
-   set_sequence++;
-   goto set_loop;
-
-// VIRTUAL STATE: RUNNER_SUMMARY
-runner_summary:
+   if (current_set->cleanup) {
+      current_set->cleanup();
+   }
+   return SET_LOOP;
+}
+static void runner_summary(int total_tests, int total_sets, TestSet set) {
    fwritelnf(stdout, "=================================================================");
    fwritelnf(stdout, "Tests run: %d, Passed: %d, Failed: %d, Skipped: %d",
-             total_tests, current_set->passed, current_set->failed, current_set->skipped);
+             total_tests, set->passed, set->failed, set->skipped);
    fwritelnf(stdout, "Total test sets registered: %d", total_sets);
-   current_set->log_stream = stdout;
-   default_on_testset_finished();
-
-   // VIRTUAL STATE: RUNNER_DONE
-   return current_set->failed > 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
-// State handlers:
-static void runner_init(TestSet sets, ST_Hooks test_hooks, int *total_tests_out, int *total_sets_out, ST_Hooks *hooks_out) {
-   // NOTE: we are not counting tests here; present for consistency
-   (void)total_tests_out;
-
-   int total_sets = 0;
-   ST_Hooks hooks = NULL;
-
-   for (TestSet set = sets; set; set = set->next) {
-      total_sets++;
-
-      if (!test_hooks && !set->hooks) {
-         if (hook_registry && hook_registry->hooks) {
-            hooks = hook_registry->hooks;
-         }
-      } else if (test_hooks) {
-         hooks = test_hooks;
-      } else if (set->hooks) {
-         hooks = set->hooks;
-      }
-
-      current_hooks = hooks;
-   }
-
-   *total_sets_out = total_sets;
-   *hooks_out = hooks;
+static int runner_done(TestSet set) {
+   // Final cleanup if needed
+   return set->failed > 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
 #if 1 // Logging functions with formatted test ouput

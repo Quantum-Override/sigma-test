@@ -44,6 +44,21 @@ static void test_divide_by_zero_throws(void) {
    }
 }
 
+static void test_with_debug_logging(void) {
+   DebugLogger.log("Starting test with debug logging");
+   int a = 10;
+   Assert.areEqual(&a, &(int){10}, INT, "a should be 10");
+   DebugLogger.log("First check passed, a = %d", a);
+
+   float b = 3.14f;
+   Assert.areEqual(&b, &(float){3.14f}, FLOAT, "b should be 3.14");
+   DebugLogger.log("Second check passed, b = %.2f", b);
+
+   char *str = "hello";
+   Assert.stringEqual("hello", str, 0, "str should be 'hello'");
+   DebugLogger.log("Third check passed, str = %s", str);
+}
+
 // Register test cases
 __attribute__((constructor)) void init_logging_tests(void) {
    testset("logging_set", set_config, set_cleanup);
@@ -56,6 +71,7 @@ __attribute__((constructor)) void init_logging_tests(void) {
    testcase("divide", test_divide);
    fail_testcase("divide_by_zero_fails", test_divide_by_zero_fails);
    testcase_throws("divide_by_zero_throws", test_divide_by_zero_throws);
+   testcase("with_debug_logging", test_with_debug_logging);
 }
 
 int add(int a, int b) {
