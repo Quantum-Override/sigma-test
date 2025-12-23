@@ -76,6 +76,8 @@ static const char *DBG_LEVELS[] = {
 static ST_Hooks current_hooks = {0};
 static atomic_size_t global_allocs = 0;
 static atomic_size_t global_frees = 0;
+static int inside_test = 0;
+static int set_started = 0;
 size_t _sigtest_alloc_count = 0;
 size_t _sigtest_free_count = 0;
 
@@ -83,11 +85,9 @@ int sys_gettime(ts_time *ts) {
    return clock_gettime(CLOCK_MONOTONIC, ts);
 }
 double get_elapsed_ms(ts_time *start, ts_time *end) {
-   return ((double)(end->tv_sec - start->tv_sec) * 1000.0) + ((double)(end->tv_nsec - start->tv_nsec) / 1000000.0);
+   return (end->tv_nsec - start->tv_nsec) / 1000.0;
 }
 //	internal logger declarations
-static void log_message(const char *, ...);
-static void log_debug(DebugLevel, const char *, ...);
 // internal clean up
 static void default_on_testcase_finish(void);
 static void default_on_testset_finished(void);
@@ -104,6 +104,15 @@ void get_timestamp(char *buffer, const char *format) {
 }
 // format write message to stream
 void fwritef(FILE *, const char *, ...);
+// print an '=' separator of given width
+static void print_sep(FILE *stream, int width) {
+   if (!stream)
+      stream = stdout;
+   for (int i = 0; i < width; ++i)
+      fputc('=', stream);
+   fputc('\n', stream);
+   fflush(stream);
+}
 // Initialize hooks with the given name/label
 ST_Hooks init_hooks(const char *name) {
    // Check if the name is NULL or empty
@@ -177,8 +186,7 @@ static void cleanup_test_runner(void) {
       __real_free(set);
       set = next;
    }
-   if (current_set && current_set->logger)
-      __real_free(current_set->logger);
+   /* do not free logger pointer here - logger may point to static data */
 
    // Reset the test set registry
    test_sets = NULL;
@@ -192,9 +200,7 @@ static string format_msg(const string fmt, va_list args) {
    return msg_buffer;
 }
 // get defined message or default message
-static string format_message(const string fmt, const string defaultMessage, va_list args) {
-   return fmt ? format_msg(fmt, args) : defaultMessage;
-}
+// format_message was inlined into specific assert handlers; removed unused helper
 // generate message for assertEquals
 static string gen_equals_fail_msg(object expected, object actual, AssertType type, const string fmt, va_list args) {
    static char msg_buffer[256];
@@ -240,9 +246,8 @@ static string gen_equals_fail_msg(object expected, object actual, AssertType typ
    string user_msg = fmt ? format_msg(fmt, args) : "";
    snprintf(msg_buffer, sizeof(msg_buffer), MESSAGE_EQUAL_FAIL, exp_str, act_str);
    if (user_msg[0] != '\0') {
-      strncat(msg_buffer, " [", sizeof(msg_buffer) - strlen(msg_buffer) - 1);
+      strncat(msg_buffer, "\n    - ", sizeof(msg_buffer) - strlen(msg_buffer) - 1);
       strncat(msg_buffer, user_msg, sizeof(msg_buffer) - strlen(msg_buffer) - 1);
-      strncat(msg_buffer, "]", sizeof(msg_buffer) - strlen(msg_buffer) - 1);
    }
    return msg_buffer;
 }
@@ -283,11 +288,15 @@ const char *st_version(void) {
 static void assert_is_true(int condition, const string fmt, ...) {
    va_list args;
    va_start(args, fmt);
-
    if (!condition) {
-      string errMessage = format_message(fmt, MESSAGE_TRUE_FAIL, args);
-      // debugf("Assertion failed: %s", errMessage);
-      set_test_context(FAIL, errMessage);
+      string user_msg = fmt ? format_msg(fmt, args) : "";
+      if (user_msg && user_msg[0] != '\0') {
+         static char buf[256];
+         snprintf(buf, sizeof(buf), "%s\n    - %s", MESSAGE_TRUE_FAIL, user_msg);
+         set_test_context(FAIL, buf);
+      } else {
+         set_test_context(FAIL, MESSAGE_TRUE_FAIL);
+      }
    } else {
       set_test_context(PASS, NULL);
    }
@@ -298,11 +307,15 @@ static void assert_is_true(int condition, const string fmt, ...) {
 static void assert_is_false(int condition, const string fmt, ...) {
    va_list args;
    va_start(args, fmt);
-
    if (condition) {
-      string errMessage = format_message(fmt, MESSAGE_TRUE_FAIL, args);
-      // debugf("Assertion failed: %s", errMessage);
-      set_test_context(FAIL, errMessage);
+      string user_msg = fmt ? format_msg(fmt, args) : "";
+      if (user_msg && user_msg[0] != '\0') {
+         static char buf[256];
+         snprintf(buf, sizeof(buf), "%s\n    - %s", MESSAGE_FALSE_FAIL, user_msg);
+         set_test_context(FAIL, buf);
+      } else {
+         set_test_context(FAIL, MESSAGE_FALSE_FAIL);
+      }
    } else {
       set_test_context(PASS, NULL);
    }
@@ -313,11 +326,15 @@ static void assert_is_false(int condition, const string fmt, ...) {
 static void assert_is_null(object ptr, const string fmt, ...) {
    va_list args;
    va_start(args, fmt);
-
    if (ptr != NULL) {
-      string errMessage = format_message(fmt, "Pointer is not NULL", args);
-      // debugf("Assertion failed: %s", errMessage);
-      set_test_context(FAIL, errMessage);
+      string user_msg = fmt ? format_msg(fmt, args) : "";
+      if (user_msg && user_msg[0] != '\0') {
+         static char buf[256];
+         snprintf(buf, sizeof(buf), "%s\n    - %s", "Pointer is not NULL", user_msg);
+         set_test_context(FAIL, buf);
+      } else {
+         set_test_context(FAIL, "Pointer is not NULL");
+      }
    } else {
       set_test_context(PASS, NULL);
    }
@@ -328,11 +345,15 @@ static void assert_is_null(object ptr, const string fmt, ...) {
 static void assert_is_not_null(object ptr, const string fmt, ...) {
    va_list args;
    va_start(args, fmt);
-
    if (ptr == NULL) {
-      string errMessage = format_message(fmt, "Pointer is NULL", args);
-      // debugf("Assertion failed: %s", errMessage);
-      set_test_context(FAIL, errMessage);
+      string user_msg = fmt ? format_msg(fmt, args) : "";
+      if (user_msg && user_msg[0] != '\0') {
+         static char buf[256];
+         snprintf(buf, sizeof(buf), "%s\n    - %s", "Pointer is NULL", user_msg);
+         set_test_context(FAIL, buf);
+      } else {
+         set_test_context(FAIL, "Pointer is NULL");
+      }
    } else {
       set_test_context(PASS, NULL);
    }
@@ -493,9 +514,14 @@ static void assert_float_within(float value, float min, float max, const string 
    va_start(args, fmt);
 
    if (value < min || value > max) {
-      string errMessage = format_message(fmt, "Value out of range", args);
-      // debugf("Assertion failed: %s", errMessage);
-      set_test_context(FAIL, errMessage);
+      string user_msg = fmt ? format_msg(fmt, args) : "";
+      if (user_msg && user_msg[0] != '\0') {
+         static char buf[256];
+         snprintf(buf, sizeof(buf), "%s\n    - %s", "Value out of range", user_msg);
+         set_test_context(FAIL, buf);
+      } else {
+         set_test_context(FAIL, "Value out of range");
+      }
    } else {
       set_test_context(PASS, NULL);
    }
@@ -523,9 +549,14 @@ static void assert_throw(const string fmt, ...) {
    va_list args;
    va_start(args, fmt);
 
-   string err_message = format_message(fmt, "Explicit throw triggered", args);
-   // writef("Throw triggered: %s", err_message);
-   set_test_context(FAIL, err_message);
+   string user_msg = fmt ? format_msg(fmt, args) : "";
+   if (user_msg && user_msg[0] != '\0') {
+      static char buf[256];
+      snprintf(buf, sizeof(buf), "%s\n    - %s", "Explicit throw triggered", user_msg);
+      set_test_context(FAIL, buf);
+   } else {
+      set_test_context(FAIL, "Explicit throw triggered");
+   }
 
    va_end(args);
 }
@@ -534,9 +565,14 @@ static void assert_fail(const string fmt, ...) {
    va_list args;
    va_start(args, fmt);
 
-   string errMessage = format_message(fmt, "Explicit failure triggered", args);
-   // debugf("Assertion failed: %s", errMessage);
-   set_test_context(FAIL, errMessage);
+   string user_msg = fmt ? format_msg(fmt, args) : "";
+   if (user_msg && user_msg[0] != '\0') {
+      static char buf[256];
+      snprintf(buf, sizeof(buf), "%s\n    - %s", "Explicit failure triggered", user_msg);
+      set_test_context(FAIL, buf);
+   } else {
+      set_test_context(FAIL, "Explicit failure triggered");
+   }
 
    va_end(args);
 }
@@ -545,9 +581,14 @@ static void assert_skip(const string fmt, ...) {
    va_list args;
    va_start(args, fmt);
 
-   string errMessage = format_message(fmt, "Testcase skipped", args);
-   // debugf("Control Triggered: %s", errMessage);
-   set_test_context(SKIP, errMessage);
+   string user_msg = fmt ? format_msg(fmt, args) : "";
+   if (user_msg && user_msg[0] != '\0') {
+      static char buf[256];
+      snprintf(buf, sizeof(buf), "%s\n    - %s", "Testcase skipped", user_msg);
+      set_test_context(SKIP, buf);
+   } else {
+      set_test_context(SKIP, "Testcase skipped");
+   }
 
    va_end(args);
 }
@@ -619,30 +660,22 @@ void testset(string name, ConfigFunc config, CleanupFunc cleanup) {
    set->skipped = 0;
    set->current = NULL;
    set->next = test_sets;
-   set->logger = __real_malloc(sizeof(struct st_logger_s));
-   if (!set->logger) {
-      fwritelnf(stdout, "Failed to allocate memory for test set logger\n");
-      __real_free(set);
-      exit(EXIT_FAILURE);
-   }
+   /* do not allocate a logger here; assign default logger during set_init */
+   set->logger = NULL;
 
-   // Execute config immediately if provided
+   // Execute config immediately if provided (open log stream first)
    if (config) {
-      char timestamp[32];
-      get_timestamp(timestamp, "%Y-%m-%d  %H:%M:%S");
-      writelnf("[%s]   Test Set: %30s", timestamp, name);
-
       config(&set->log_stream);
       if (!set->log_stream) {
          set->log_stream = stdout; // Fallback to stdout if config fails
       }
+      /* Do not write header here — runner's before_set will write it when executing */
    } else {
       // no config function we need to default log_stream to console output
       set->log_stream = stdout;
    }
 
-   set->logger->log = log_message;
-   set->logger->debug = log_debug;
+   /* logger will be set in set_init (default to DebugLogger) */
 
    // Handle allocation failure after config
    if (!set->name) {
@@ -818,8 +851,21 @@ static void default_on_start_test(object context) {
    // zero out the end time
    ctx->end = (ts_time){0, 0};
 
-   if (ctx->verbose && current_set) {
-      current_set->logger->log("Starting test: %s\n", current_set->current->name);
+   TestCase tc = current_set ? current_set->current : NULL;
+   Logger logger = current_set ? current_set->logger : NULL;
+
+   (void)set_started; /* header is printed in before_set */
+   if (tc) {
+      inside_test = 1;
+      /* Print Running without newline so result can be appended on same line if no debug output */
+      char running_buf[128];
+      int len = snprintf(running_buf, sizeof(running_buf), "Running: %-*s", 40, tc->name);
+      FILE *stream = (current_set && current_set->log_stream) ? current_set->log_stream : stdout;
+      fwritef(stream, "%s", running_buf);
+      /* record that we've written Running without newline */
+      ((struct { int count; int verbose; ts_time start; ts_time end; RunnerState state; int ran_no_newline; int had_debug; int running_len; } *)context)->ran_no_newline = 1;
+      ((struct { int count; int verbose; ts_time start; ts_time end; RunnerState state; int ran_no_newline; int had_debug; int running_len; } *)context)->had_debug = 0;
+      ((struct { int count; int verbose; ts_time start; ts_time end; RunnerState state; int ran_no_newline; int had_debug; int running_len; } *)context)->running_len = len;
    }
 }
 static void default_on_end_test(object context) {
@@ -835,9 +881,9 @@ static void default_on_end_test(object context) {
       fwritelnf(stderr, "Error: Failed to get system end time");
       exit(EXIT_FAILURE);
    }
-   if (ctx->verbose && current_set) {
-      current_set->logger->log("Finished test: %s\n", current_set->current->name);
-   }
+
+   inside_test = 0;
+   /* end time recorded; final result printing occurs in on_test_result after process_result */
 }
 static void default_after_test(object context) {
    struct
@@ -846,6 +892,7 @@ static void default_after_test(object context) {
       int verbose;
       ts_time start;
       ts_time end;
+      RunnerState state;
    } *ctx = context;
 
    ctx->count--;
@@ -857,35 +904,46 @@ static void default_on_test_result(const TestSet set, const TestCase tc, object 
       int verbose;
       ts_time start;
       ts_time end;
+      RunnerState state;
+      int ran_no_newline;
+      int had_debug;
+      int running_len;
    } *ctx = context;
 
-   const char *status = TEST_STATES[tc->test_result.state];
-   //	if we have a zero end time, we need to set it
-   if (ctx->end.tv_sec == 0 && ctx->end.tv_nsec == 0) {
-      if (sys_gettime(&ctx->end) == -1) {
-         fwritelnf(stderr, "Error: Failed to get system end time");
-         exit(EXIT_FAILURE);
-      }
-   }
-   // calculate elapsed time
-   double elapsed_ms = get_elapsed_ms(&ctx->start, &ctx->end);
-   // Log duration: show "< 0.1 µs" if negative or too small, ms for >=1ms, µs otherwise
-   if (elapsed_ms < 0.0001) {
-      set->logger->log("Running: %-36s  < 0.1   µs  [%s]\n", tc->name, status);
-   } else if (elapsed_ms >= 1.0) {
-      set->logger->log("Running: %-37s  %6.3f ms  [%s]\n", tc->name, elapsed_ms, status);
+   if (!set || !tc || !context)
+      return;
+
+   double elapsed = get_elapsed_ms(&ctx->start, &ctx->end);
+   const char *state_str = TEST_STATES[tc->test_result.state];
+
+   char result_buf[64];
+   snprintf(result_buf, sizeof(result_buf), "%.3f µs [%s]", elapsed, state_str);
+
+   if (!ctx->had_debug && ctx->ran_no_newline) {
+      /* No debug output occurred; append result to the Running line. Use stored running_len. */
+      int pad = 80 - (ctx->running_len + (int)strlen(result_buf));
+      if (pad < 0)
+         pad = 0;
+      /* print padding and result, then newline */
+      for (int i = 0; i < pad; ++i)
+         fputc(' ', set->log_stream);
+      fprintf(set->log_stream, "%s\n", result_buf);
    } else {
-      set->logger->log("Running: %-37s  %6.3f µs  [%s]\n", tc->name, elapsed_ms * 1000.0, status);
+      if (tc->test_result.state == FAIL && tc->test_result.message) {
+         /* print failure message indented */
+         fwritelnf(set->log_stream, "  - %s", tc->test_result.message);
+      }
+      /* right-justify result at column 80 on its own line */
+      int pad = 80 - (int)strlen(result_buf);
+      if (pad < 0)
+         pad = 0;
+      fwritelnf(set->log_stream, "%*s%s", pad, "", result_buf);
    }
 
-   if (ctx->verbose && tc->test_result.message) {
-      DebugLevel level = (tc->test_result.state == PASS) ? DBG_INFO : DBG_DEBUG;
-      set->logger->debug(level, "\tmessage= %s\n", tc->test_result.message ? tc->test_result.message : "NULL");
-   }
-   if (ctx->verbose) {
-      set->logger->debug(DBG_DEBUG, "\tstart= %ld.%04ld", ctx->start.tv_sec, ctx->start.tv_nsec);
-      set->logger->log("\tend=   %ld.%04ld\n", ctx->end.tv_sec, ctx->end.tv_nsec);
-   }
+      /* reset flags for next test */
+   ctx->ran_no_newline = 0;
+   ctx->had_debug = 0;
+   ctx->running_len = 0;
 }
 static void default_on_error(const char *message, object context) {
    struct {
@@ -893,6 +951,7 @@ static void default_on_error(const char *message, object context) {
       int verbose;
       ts_time start;
       ts_time end;
+      RunnerState state;
    } *ctx = context;
 
    if (ctx->verbose && current_set) {
@@ -909,27 +968,44 @@ static void default_on_testcase_finish(void) {
 }
 static void default_on_testset_finished(void) {
    //  get the atomic allocation counts
-
    size_t leaks = (_sigtest_alloc_count > _sigtest_free_count)
                       ? (_sigtest_alloc_count - _sigtest_free_count)
                       : 0;
-   fwritelnf(current_set->log_stream, "\n===== Memory Allocations Report =================================");
-   if (leaks > 0) {
-      fwritelnf(current_set->log_stream, "WARNING: MEMORY LEAK — %zu unfreed allocation(s)", leaks);
-   } else if (_sigtest_alloc_count > 0) {
-      fwritelnf(current_set->log_stream, "Memory clean — all %zu allocations freed.",
-                _sigtest_alloc_count);
+   /* Print memory allocation report into the test log only (aggregate counts).
+    * Final printing to stdout will be handled by runner_summary to ensure timestamp appears first. */
+   if (current_set && current_set->log_stream) {
+      char memhdr[128];
+      snprintf(memhdr, sizeof(memhdr), "===== Memory Allocations Report ");
+      int mpad = 80 - (int)strlen(memhdr);
+      if (mpad < 0)
+         mpad = 0;
+      fprintf(current_set->log_stream, "\n%s", memhdr);
+      for (int i = 0; i < mpad; ++i)
+         fputc('=', current_set->log_stream);
+      fputc('\n', current_set->log_stream);
+
+      if (leaks > 0) {
+         fwritelnf(current_set->log_stream, "WARNING: MEMORY LEAK — %zu unfreed allocation(s)", leaks);
+      } else if (_sigtest_alloc_count > 0) {
+         fwritelnf(current_set->log_stream, "Memory clean — all %zu allocations freed.", _sigtest_alloc_count);
+      }
+
+      fwritelnf(current_set->log_stream, "  Total mallocs:               %zu", _sigtest_alloc_count);
+      fwritelnf(current_set->log_stream, "  Total frees:                 %zu", _sigtest_free_count);
    }
 
-   fwritelnf(current_set->log_stream, "  Total mallocs:                %zu", _sigtest_alloc_count);
-   fwritelnf(current_set->log_stream, "  Total frees:                  %zu", _sigtest_free_count);
+   set_started = 0;
 }
 static struct {
    int count;
    int verbose;
    ts_time start;
    ts_time end;
-} default_ctx = {0, 0, {0, 0}, {0, 0}};
+   RunnerState state;
+   int ran_no_newline;
+   int had_debug;
+   int running_len;
+} default_ctx = {0, 0, {0, 0}, {0, 0}, RUNNER_IDLE};
 static const st_hooks_s default_hooks = {
     .name = "default",
     .before_set = NULL,
@@ -969,6 +1045,7 @@ int main(void) {
 }
 #endif // SIGTEST_TEST
 
+// Runner state handlers
 static RunnerState runner_init(TestSet, ST_Hooks, int *, int *, ST_Hooks *);
 static RunnerState set_loop(TestSet *, int *);
 static RunnerState set_init(TestSet, int *, int *, int *, int *, TestSet *);
@@ -1010,6 +1087,7 @@ int run_tests(TestSet sets, ST_Hooks test_hooks) {
 
    RunnerState state = RUNNER_INIT;
    while (state != RUNNER_DONE) {
+      default_ctx.state = state; // update default context state
       switch (state) {
       case RUNNER_INIT:
          state = runner_init(sets, test_hooks, &total_tests, &total_sets, &hooks);
@@ -1064,6 +1142,13 @@ int run_tests(TestSet sets, ST_Hooks test_hooks) {
 
          break;
       case TEARDOWN_TEST:
+         /* Process result before teardown so the elapsed/status prints inside teardown scope */
+         state = process_result(tc, current_set, hooks,
+                                &tc_passed, &tc_failed, &tc_skipped,
+                                &tc_total, &total_tests);
+         /* advance iterator now (we will still run teardown for current test)
+          * process_result returns CASE_LOOP normally but we force teardown next */
+         current_tc_iter = current_tc_iter->next;
          state = teardown_test(current_set);
 
          break;
@@ -1073,16 +1158,16 @@ int run_tests(TestSet sets, ST_Hooks test_hooks) {
 
          break;
       case PROCESS_RESULT:
-         state = process_result(tc, current_set, hooks,
-                                &tc_passed, &tc_failed, &tc_skipped,
-                                &tc_total, &total_tests);
-         current_tc_iter = current_tc_iter->next;
+         /* no-op: results are processed in TEARDOWN_TEST to ensure result prints before teardown
+          * keep iterator advance as a fallback */
+         if (current_tc_iter)
+            current_tc_iter = current_tc_iter->next;
+         state = CASE_LOOP;
 
          break;
       case AFTER_SET:
          state = after_set(hooks, current_set,
-                           tc_total, tc_passed, tc_failed, tc_skipped,
-                           total_tests);
+                           set_sequence, tc_total, tc_passed, tc_failed, tc_skipped);
          current_set_iter = current_set_iter->next;
 
          break;
@@ -1124,6 +1209,20 @@ static RunnerState runner_init(TestSet sets, ST_Hooks test_hooks, int *total_tes
       }
 
       current_hooks = hooks;
+      if (hooks) {
+         if (!hooks->before_test)
+            hooks->before_test = default_before_test;
+         if (!hooks->after_test)
+            hooks->after_test = default_after_test;
+         if (!hooks->on_start_test)
+            hooks->on_start_test = default_on_start_test;
+         if (!hooks->on_end_test)
+            hooks->on_end_test = default_on_end_test;
+         if (!hooks->on_error)
+            hooks->on_error = default_on_error;
+         if (!hooks->on_test_result)
+            hooks->on_test_result = default_on_test_result;
+      }
    }
 
    *total_sets_out = total_sets;
@@ -1146,11 +1245,12 @@ static RunnerState set_init(TestSet current_set_iter, int *tc_total_out, int *tc
    *tc_failed_out = 0;
    *tc_skipped_out = 0;
 
-   if (!set->log_stream || !set->logger) {
+   if (!set->log_stream) {
       set->log_stream = stdout;
    }
    // Set current_set to the executing set for writef/debugf
    *current = set;
+   (*current)->logger = (Logger)&DebugLogger;
 
    return BEFORE_SET;
 }
@@ -1159,9 +1259,14 @@ static RunnerState before_set(ST_Hooks hooks, int set_sequence, TestSet current,
       hooks->before_set(current, hooks->context);
    } else {
       get_timestamp(timestamp, "%Y-%m-%d  %H:%M:%S");
-      fwritelnf(current->log_stream, "[%d] %-25s:%4d %-10s%s",
-                set_sequence, current->name, current->count, ":", timestamp);
-      fwritelnf(current->log_stream, "=================================================================");
+      char header[128];
+      snprintf(header, sizeof(header), "[%d] %-25s : %4d : %20s",
+               set_sequence, current->name, current->count, timestamp);
+      int pad = 80 - (int)strlen(header);
+      if (pad < 0)
+         pad = 0;
+      fwritelnf(current->log_stream, "%s%*s", header, pad, "");
+      print_sep(current->log_stream, 80);
    }
 
    return CASE_LOOP;
@@ -1191,6 +1296,8 @@ static RunnerState setup_test(TestSet set) {
 static RunnerState start_test(ST_Hooks hooks) {
    if (hooks && hooks->on_start_test) {
       hooks->on_start_test(hooks->context);
+   } else {
+      default_hooks.on_start_test(hooks->context);
    }
    return EXECUTE_TEST;
 }
@@ -1218,7 +1325,7 @@ static RunnerState after_test(ST_Hooks hooks) {
    if (hooks && hooks->after_test) {
       hooks->after_test(hooks->context);
    }
-   return PROCESS_RESULT;
+   return CASE_LOOP;
 }
 static RunnerState process_result(TestCase tc, TestSet set, ST_Hooks hooks,
                                   int *tc_passed, int *tc_failed, int *tc_skipped,
@@ -1280,6 +1387,7 @@ static RunnerState process_result(TestCase tc, TestSet set, ST_Hooks hooks,
 
    (*tc_total)++;
    (*total_tests)++;
+   /* per-set summary is emitted in after_set where the set sequence is available */
 
    return CASE_LOOP;
 }
@@ -1288,53 +1396,48 @@ static RunnerState after_set(ST_Hooks hooks, TestSet set,
    if (hooks && hooks->after_set) {
       hooks->after_set(current_set, hooks->context);
    }
-   fwritelnf(current_set->log_stream, "=================================================================");
-   fwritelnf(current_set->log_stream, "[%d]     TESTS=%3d        PASS=%3d        FAIL=%3d        SKIP=%3d",
-             sequence, tc_total, tc_passed, tc_failed, tc_skipped);
 
+   /* Emit per-set summary (use provided sequence and counters) */
+   print_sep(set->log_stream, 80);
+   char stats[128];
+   snprintf(stats, sizeof(stats), "[%d]     TESTS=%3d        PASS=%3d        FAIL=%3d        SKIP=%3d",
+            sequence, tc_total, tc_passed, tc_failed, tc_skipped);
+   fwritelnf(set->log_stream, "%s", stats);
+
+   /* file-local separator */
    default_on_testset_finished();
-   if (current_set->cleanup) {
-      current_set->cleanup();
+   if (set->cleanup) {
+      set->cleanup();
    }
    return SET_LOOP;
 }
 static void runner_summary(int total_tests, int total_sets, TestSet set) {
-   fwritelnf(stdout, "=================================================================");
+   char timestamp[32];
+   get_timestamp(timestamp, "%Y-%m-%d %H:%M:%S");
+   char hdr[128];
+   snprintf(hdr, sizeof(hdr), "[%s]   Test Set:                    %s", timestamp, set->name);
+   int hpad = 80 - (int)strlen(hdr);
+   if (hpad < 0)
+      hpad = 0;
+   fwritelnf(stdout, "%s%*s", hdr, hpad, "");
+   print_sep(stdout, 80);
    fwritelnf(stdout, "Tests run: %d, Passed: %d, Failed: %d, Skipped: %d",
              total_tests, set->passed, set->failed, set->skipped);
    fwritelnf(stdout, "Total test sets registered: %d", total_sets);
+   /* Print aggregate malloc/free totals with adjusted alignment */
+   fwritelnf(stdout, "Total mallocs:              %zu", _sigtest_alloc_count);
+   fwritelnf(stdout, "Total frees:                %zu", _sigtest_free_count);
 }
 static int runner_done(TestSet set) {
    // Final cleanup if needed
    return set->failed > 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
-#if 1 // Logging functions with formatted test ouput
-static void log_message(const char *fmt, ...) {
-   va_list args;
-   va_start(args, fmt);
-
-   FILE *stream = current_set && current_set->log_stream ? current_set->log_stream : stdout;
-   vfprintf(stream, fmt, args);
-   fflush(stream);
-
-   va_end(args);
-}
+#if 1 // Region: Logging functions with formatted test ouput
 static void flog_debug(DebugLevel level, FILE *stream, const char *fmt, ...) {
    va_list args;
    va_start(args, fmt);
 
-   fprintf(stream, "[%s] ", DBG_LEVELS[level]);
-   vfprintf(stream, fmt, args);
-   fflush(stream);
-
-   va_end(args);
-}
-static void log_debug(DebugLevel level, const char *fmt, ...) {
-   va_list args;
-   va_start(args, fmt);
-
-   FILE *stream = current_set && current_set->log_stream ? current_set->log_stream : stdout;
    fprintf(stream, "[%s] ", DBG_LEVELS[level]);
    vfprintf(stream, fmt, args);
    fflush(stream);
@@ -1347,6 +1450,16 @@ void writef(const char *fmt, ...) {
    va_start(args, fmt);
 
    FILE *stream = (current_set && current_set->log_stream) ? current_set->log_stream : stdout;
+   /* If Running was printed without newline and this is the first debug output, break the line
+    * so debug lines start on the next line and are indented. Also mark that debug occurred. */
+   if (inside_test && default_ctx.ran_no_newline && strncmp(fmt, "Running:", 8) != 0 && strncmp(fmt, "[%d]", 4) != 0 && strncmp(fmt, "=", 1) != 0) {
+      fputc('\n', stream);
+      default_ctx.ran_no_newline = 0;
+      default_ctx.had_debug = 1;
+   }
+   if (inside_test && strncmp(fmt, "Running:", 8) != 0 && strncmp(fmt, "[%d]", 4) != 0 && strncmp(fmt, "=", 1) != 0) {
+      fprintf(stream, "  - ");
+   }
    vfprintf(stream, fmt, args);
    fflush(stream);
 
@@ -1358,6 +1471,14 @@ void writelnf(const char *fmt, ...) {
    va_start(args, fmt);
 
    FILE *stream = (current_set && current_set->log_stream) ? current_set->log_stream : stdout;
+   if (inside_test && default_ctx.ran_no_newline && strncmp(fmt, "Running:", 8) != 0 && strncmp(fmt, "[%d]", 4) != 0 && strncmp(fmt, "=", 1) != 0) {
+      fputc('\n', stream);
+      default_ctx.ran_no_newline = 0;
+      default_ctx.had_debug = 1;
+   }
+   if (inside_test && strncmp(fmt, "Running:", 8) != 0 && strncmp(fmt, "[%d]", 4) != 0 && strncmp(fmt, "=", 1) != 0) {
+      fprintf(stream, "  - ");
+   }
    vfprintf(stream, fmt, args);
    fprintf(stream, "\n");
    fflush(stream);

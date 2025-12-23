@@ -22,7 +22,7 @@ static void testcase_setup(void) {
 }
 static void testcase_teardown(void) {
    teardown_count++;
-   DebugLogger.log("Testcase teardown called, count: %d", teardown_count);
+   DebugLogger.log("Testcase teardown called, count: %d\n", teardown_count);
 }
 /* Test cases */
 static void test_add(void) {

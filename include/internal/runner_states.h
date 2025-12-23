@@ -27,6 +27,7 @@
 #pragma once
 
 typedef enum {
+   RUNNER_IDLE,
    RUNNER_INIT,
    SET_LOOP,
    SET_INIT,

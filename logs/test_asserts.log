@@ -1,23 +1,23 @@
 Test Source: test/test_asserts.c
-[2] asserts_set              :  13 :         2025-12-22  05:29:42
-=================================================================
-Running: Assert Is Null                          0.246 µs  [PASS]
-Running: Assert Is Not Null                      0.597 µs  [PASS]
-Running: Assert Int Not Equal                    0.132 µs  [PASS]
-Running: Assert Float Not Equal                < 0.1   µs  [PASS]
-Running: Assert Strings Not Comparable           0.459 µs  [PASS]
-Running: Assert Float Within                   < 0.1   µs  [PASS]
-Running: Assert Float Not Within                 0.916 µs  [PASS]
-Running: Assert String Equal                     0.275 µs  [PASS]
-Running: Assert String Not Equal                 0.911 µs  [PASS]
-Running: Assert String Case Insensitive        < 0.1   µs  [PASS]
-Running: Assert String Case Sensitive            0.595 µs  [PASS]
-Running: Assert Fail Test Case                   0.202 µs  [PASS]
-Running: Assert Skip Test Case                   0.183 µs  [SKIP]
-=================================================================
-[13]     TESTS= 12        PASS=  0        FAIL=  1        SKIP= 13
+[2] asserts_set               :   13 : 2025-12-23  16:05:32                     
+================================================================================
+Running: Assert Is Null                                         1.897 µs [PASS]
+Running: Assert Is Not Null                                     1.994 µs [PASS]
+Running: Assert Int Not Equal                                   1.624 µs [PASS]
+Running: Assert Float Not Equal                                 1.438 µs [PASS]
+Running: Assert Strings Not Comparable                          1.754 µs [PASS]
+Running: Assert Float Within                                    1.443 µs [PASS]
+Running: Assert Float Not Within                                3.425 µs [PASS]
+Running: Assert String Equal                                    1.552 µs [PASS]
+Running: Assert String Not Equal                                2.129 µs [PASS]
+Running: Assert String Case Insensitive                         1.444 µs [PASS]
+Running: Assert String Case Sensitive                           1.801 µs [PASS]
+Running: Assert Fail Test Case                                  1.697 µs [PASS]
+Running: Assert Skip Test Case                                  1.625 µs [SKIP]
+================================================================================
+[2]     TESTS= 13        PASS= 12        FAIL=  0        SKIP=  1
 
-===== Memory Allocations Report =================================
+===== Memory Allocations Report ================================================
 Memory clean — all 1 allocations freed.
-  Total mallocs:                1
-  Total frees:                  1
+  Total mallocs:               1
+  Total frees:                 1
