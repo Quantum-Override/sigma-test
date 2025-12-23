@@ -43,6 +43,11 @@ void test_expect_throw(void) {
    Assert.throw("Test explicitly thrown");
 }
 
+void test_expect_throw_no_throw(void) {
+   // No exception thrown here
+   Assert.isTrue(1 == 1, "This should pass");
+}
+
 // Register test cases
 __attribute__((constructor)) void init_controls_tests(void) {
    testset("constrols_set", set_config, NULL);
@@ -57,4 +62,5 @@ __attribute__((constructor)) void init_controls_tests(void) {
    fail_testcase("complex_failure", test_complex_failure);
 
    testcase_throws("test_expect_exception", test_expect_throw);
+   testcase_throws("test_expect_throw", test_expect_throw_no_throw);
 }

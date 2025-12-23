@@ -1,15 +1,19 @@
-Test Sigtest Log. Version 0.3.0
+Test Sigtest Log. Version 1.00.1-pre1
 Test Source: test/test_sigtest.c
-[1] core_sigtest_set         :   9 :         2025-05-20  10:13:08
-=================================================================
-Running: assertTrue                               1.8 us  [PASS]
-Running: assertFalse                              0.3 us  [PASS]
-Running: assertEquals                             0.5 us  [PASS]
-Running: equalsFail                               9.8 us  [PASS]
-Running: equalsFloatsFail                         2.7 us  [PASS]
-Running: charEquals                               0.2 us  [PASS]
-Running: pointersEqual                            0.3 us  [PASS]
-Running: pointersNotEqual                         2.3 us  [PASS]
-Running: stringsNotComparable                     0.4 us  [PASS]
-=================================================================
-[1]     TESTS=  9        PASS=  9        FAIL=  0        SKIP=  0
+[2] core_sigtest_set          :    9 : 2025-12-23  16:41:10                     
+================================================================================
+Running: assertTrue                                             1.927 µs [PASS]
+Running: assertFalse                                            2.623 µs [PASS]
+Running: assertEquals                                           1.667 µs [PASS]
+Running: equalsFail                                             2.617 µs [PASS]
+Running: equalsFloatsFail                                       2.128 µs [PASS]
+Running: charEquals                                             1.536 µs [PASS]
+Running: pointersEqual                                          1.383 µs [PASS]
+Running: pointersNotEqual                                       1.967 µs [PASS]
+Running: stringsNotComparable                                   1.443 µs [PASS]
+================================================================================
+[2]     TESTS=  9        PASS=  9        FAIL=  0        SKIP=  0
+
+===== Memory Allocations Report ================================================
+  Total mallocs:               0
+  Total frees:                 0

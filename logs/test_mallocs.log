@@ -1,0 +1,11 @@
+[2] Memory Allocations Report :    2 : 2025-12-23  16:41:10                     
+================================================================================
+Running: Basic: Global leak detection                           2.170 µs [PASS]
+Running: Basic: Clean run                                       1.706 µs [PASS]
+================================================================================
+[2]     TESTS=  2        PASS=  2        FAIL=  0        SKIP=  0
+
+===== Memory Allocations Report ================================================
+WARNING: MEMORY LEAK — 1 unfreed allocation(s)
+  Total mallocs:               2
+  Total frees:                 1

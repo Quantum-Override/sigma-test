@@ -1,0 +1,83 @@
+==332627== Memcheck, a memory error detector
+==332627== Copyright (C) 2002-2022, and GNU GPL'd, by Julian Seward et al.
+==332627== Using Valgrind-3.22.0 and LibVEX; rerun with -h for copyright info
+==332627== Command: ./build/test/test_logging
+==332627== Parent PID: 328208
+==332627== 
+==332627== Conditional jump or move depends on uninitialised value(s)
+==332627==    at 0x10D681: runner_init (sigtest.c:1113)
+==332627==    by 0x10D3B6: run_tests (sigtest.c:1012)
+==332627==    by 0x10D2C8: main (sigtest.c:960)
+==332627==  Uninitialised value was created by a heap allocation
+==332627==    at 0x4846828: malloc (in /usr/libexec/valgrind/vgpreload_memcheck-amd64-linux.so)
+==332627==    by 0x10C4C9: testset (sigtest.c:606)
+==332627==    by 0x10A914: init_logging_tests (test_logging.c:64)
+==332627==    by 0x4897303: call_init (libc-start.c:145)
+==332627==    by 0x4897303: __libc_start_main@@GLIBC_2.34 (libc-start.c:347)
+==332627==    by 0x10A3C4: (below main) (in /home/badkraft/repos/sigmatest/build/test/test_logging)
+==332627== 
+==332627== Invalid read of size 8
+==332627==    at 0x10AD82: cleanup_test_runner (sigtest.c:182)
+==332627==    by 0x10D2D0: main (sigtest.c:961)
+==332627==  Address 0x4a820a0 is 96 bytes inside a block of size 104 free'd
+==332627==    at 0x484988F: free (in /usr/libexec/valgrind/vgpreload_memcheck-amd64-linux.so)
+==332627==    by 0x10AD5B: cleanup_test_runner (sigtest.c:179)
+==332627==    by 0x10D2D0: main (sigtest.c:961)
+==332627==  Block was alloc'd at
+==332627==    at 0x4846828: malloc (in /usr/libexec/valgrind/vgpreload_memcheck-amd64-linux.so)
+==332627==    by 0x10C4C9: testset (sigtest.c:606)
+==332627==    by 0x10A914: init_logging_tests (test_logging.c:64)
+==332627==    by 0x4897303: call_init (libc-start.c:145)
+==332627==    by 0x4897303: __libc_start_main@@GLIBC_2.34 (libc-start.c:347)
+==332627==    by 0x10A3C4: (below main) (in /home/badkraft/repos/sigmatest/build/test/test_logging)
+==332627== 
+==332627== Invalid read of size 8
+==332627==    at 0x10AD92: cleanup_test_runner (sigtest.c:183)
+==332627==    by 0x10D2D0: main (sigtest.c:961)
+==332627==  Address 0x4a820a0 is 96 bytes inside a block of size 104 free'd
+==332627==    at 0x484988F: free (in /usr/libexec/valgrind/vgpreload_memcheck-amd64-linux.so)
+==332627==    by 0x10AD5B: cleanup_test_runner (sigtest.c:179)
+==332627==    by 0x10D2D0: main (sigtest.c:961)
+==332627==  Block was alloc'd at
+==332627==    at 0x4846828: malloc (in /usr/libexec/valgrind/vgpreload_memcheck-amd64-linux.so)
+==332627==    by 0x10C4C9: testset (sigtest.c:606)
+==332627==    by 0x10A914: init_logging_tests (test_logging.c:64)
+==332627==    by 0x4897303: call_init (libc-start.c:145)
+==332627==    by 0x4897303: __libc_start_main@@GLIBC_2.34 (libc-start.c:347)
+==332627==    by 0x10A3C4: (below main) (in /home/badkraft/repos/sigmatest/build/test/test_logging)
+==332627== 
+==332627== Invalid free() / delete / delete[] / realloc()
+==332627==    at 0x484988F: free (in /usr/libexec/valgrind/vgpreload_memcheck-amd64-linux.so)
+==332627==    by 0x10AD9D: cleanup_test_runner (sigtest.c:183)
+==332627==    by 0x10D2D0: main (sigtest.c:961)
+==332627==  Address 0x111cd0 is in a r-- mapped file /home/badkraft/repos/sigmatest/build/test/test_logging segment
+==332627== 
+==332627== 
+==332627== HEAP SUMMARY:
+==332627==     in use at exit: 32 bytes in 2 blocks
+==332627==   total heap usage: 33 allocs, 32 frees, 13,166 bytes allocated
+==332627== 
+==332627== 16 bytes in 1 blocks are still reachable in loss record 1 of 2
+==332627==    at 0x4846828: malloc (in /usr/libexec/valgrind/vgpreload_memcheck-amd64-linux.so)
+==332627==    by 0x10D244: init_default_hooks (sigtest.c:943)
+==332627==    by 0x4897303: call_init (libc-start.c:145)
+==332627==    by 0x4897303: __libc_start_main@@GLIBC_2.34 (libc-start.c:347)
+==332627==    by 0x10A3C4: (below main) (in /home/badkraft/repos/sigmatest/build/test/test_logging)
+==332627== 
+==332627== 16 bytes in 1 blocks are definitely lost in loss record 2 of 2
+==332627==    at 0x4846828: malloc (in /usr/libexec/valgrind/vgpreload_memcheck-amd64-linux.so)
+==332627==    by 0x10C5B7: testset (sigtest.c:624)
+==332627==    by 0x10A914: init_logging_tests (test_logging.c:64)
+==332627==    by 0x4897303: call_init (libc-start.c:145)
+==332627==    by 0x4897303: __libc_start_main@@GLIBC_2.34 (libc-start.c:347)
+==332627==    by 0x10A3C4: (below main) (in /home/badkraft/repos/sigmatest/build/test/test_logging)
+==332627== 
+==332627== LEAK SUMMARY:
+==332627==    definitely lost: 16 bytes in 1 blocks
+==332627==    indirectly lost: 0 bytes in 0 blocks
+==332627==      possibly lost: 0 bytes in 0 blocks
+==332627==    still reachable: 16 bytes in 1 blocks
+==332627==         suppressed: 0 bytes in 0 blocks
+==332627== 
+==332627== For lists of detected and suppressed errors, rerun with: -s
+==332627== ERROR SUMMARY: 5 errors from 5 contexts (suppressed: 0 from 0)

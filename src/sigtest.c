@@ -94,6 +94,33 @@ static void default_on_testset_finished(void);
 // hooks registry
 static HookRegistry *hook_registry = NULL;
 
+/*
+ * hook_ctx_t - shared hook context structure
+ *
+ * This structure is used as the generic `context` pointer passed into hook
+ * callbacks. Hooks may cast the `context` to `hook_ctx_t *` to read or write
+ * runtime state shared across hooks for the current test execution.
+ *
+ * Fields:
+ *  - count:     reference count / nesting counter used by before/after hooks
+ *  - verbose:   verbosity flag
+ *  - start,end: timestamps recorded around a test execution
+ *  - state:     current runner state
+ *  - ran_no_newline: flag set when the "Running:" line was printed without newline
+ *  - had_debug:      flag set when debug/log messages were emitted inside a test
+ *  - running_len:    length of the printed "Running:" prefix used for inline result padding
+ */
+typedef struct hook_ctx_s {
+   int count;
+   int verbose;
+   ts_time start;
+   ts_time end;
+   RunnerState state;
+   int ran_no_newline;
+   int had_debug;
+   int running_len;
+} hook_ctx_t;
+
 //	Implementations for internal helpers
 /**
  * Formats the current time into a buffer using the specified format
@@ -824,9 +851,19 @@ void register_hooks(ST_Hooks hooks) {
    }
 }
 //	default test hooks
+static struct {
+   int count;
+   int verbose;
+   ts_time start;
+   ts_time end;
+   RunnerState state;
+   int ran_no_newline;
+   int had_debug;
+   int running_len;
+} default_ctx = {0, 0, {0, 0}, {0, 0}, RUNNER_IDLE, 0, 0, 0};
+
 static void default_before_test(object context) {
-   struct
-   {
+   struct {
       int count;
       int verbose;
       ts_time start;
@@ -836,8 +873,7 @@ static void default_before_test(object context) {
    ctx->count++;
 }
 static void default_on_start_test(object context) {
-   struct
-   {
+   struct {
       int count;
       int verbose;
       ts_time start;
@@ -852,7 +888,7 @@ static void default_on_start_test(object context) {
    ctx->end = (ts_time){0, 0};
 
    TestCase tc = current_set ? current_set->current : NULL;
-   Logger logger = current_set ? current_set->logger : NULL;
+   // Logger logger = current_set ? current_set->logger : NULL;
 
    (void)set_started; /* header is printed in before_set */
    if (tc) {
@@ -863,14 +899,13 @@ static void default_on_start_test(object context) {
       FILE *stream = (current_set && current_set->log_stream) ? current_set->log_stream : stdout;
       fwritef(stream, "%s", running_buf);
       /* record that we've written Running without newline */
-      ((struct { int count; int verbose; ts_time start; ts_time end; RunnerState state; int ran_no_newline; int had_debug; int running_len; } *)context)->ran_no_newline = 1;
-      ((struct { int count; int verbose; ts_time start; ts_time end; RunnerState state; int ran_no_newline; int had_debug; int running_len; } *)context)->had_debug = 0;
-      ((struct { int count; int verbose; ts_time start; ts_time end; RunnerState state; int ran_no_newline; int had_debug; int running_len; } *)context)->running_len = len;
+      default_ctx.ran_no_newline = 1;
+      default_ctx.had_debug = 0;
+      default_ctx.running_len = len;
    }
 }
 static void default_on_end_test(object context) {
-   struct
-   {
+   struct {
       int count;
       int verbose;
       ts_time start;
@@ -886,8 +921,7 @@ static void default_on_end_test(object context) {
    /* end time recorded; final result printing occurs in on_test_result after process_result */
 }
 static void default_after_test(object context) {
-   struct
-   {
+   struct {
       int count;
       int verbose;
       ts_time start;
@@ -898,8 +932,7 @@ static void default_after_test(object context) {
    ctx->count--;
 }
 static void default_on_test_result(const TestSet set, const TestCase tc, object context) {
-   struct
-   {
+   struct {
       int count;
       int verbose;
       ts_time start;
@@ -940,7 +973,7 @@ static void default_on_test_result(const TestSet set, const TestCase tc, object 
       fwritelnf(set->log_stream, "%*s%s", pad, "", result_buf);
    }
 
-      /* reset flags for next test */
+   /* reset flags for next test */
    ctx->ran_no_newline = 0;
    ctx->had_debug = 0;
    ctx->running_len = 0;
@@ -996,16 +1029,6 @@ static void default_on_testset_finished(void) {
 
    set_started = 0;
 }
-static struct {
-   int count;
-   int verbose;
-   ts_time start;
-   ts_time end;
-   RunnerState state;
-   int ran_no_newline;
-   int had_debug;
-   int running_len;
-} default_ctx = {0, 0, {0, 0}, {0, 0}, RUNNER_IDLE};
 static const st_hooks_s default_hooks = {
     .name = "default",
     .before_set = NULL,

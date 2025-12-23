@@ -1,48 +1,93 @@
 {
-  "test_set": "hooks_set",
-  "timestamp": "2025-12-21 06:22:13",
-  "tests": [
-    {
-      "test": "JSON: Should Pass",
-      "status": "PASS",
-      "duration_us": "0.541",
-      "message": ""
-    },
-    {
-      "test": "JSON: Should Fail",
-      "status": "FAIL",
-      "duration_us": "0.439",
-      "message": "1 should not equal 0"
-    },
-    {
-      "test": "JSON: Should Expect Fail",
-      "status": "PASS",
-      "duration_us": "0.180",
-      "message": "Expected failure occurred"
-    },
-    {
-      "test": "JSON: Should Skip",
-      "status": "SKIP",
-      "duration_us": "0.294",
-      "message": "This test is skipped"
-    },
-    {
-      "test": "JSON: Should Throw",
-      "status": "FAIL",
-      "duration_us": "0.210",
-      "message": "This test is explicitly thrown"
-    }
-  ],
-  "summary": {
-    "total": 5,
-    "passed": 2,
-    "failed": 2,
-    "skipped": 1
-  }
-}
-=================================================================
-[1]     TESTS=  5        PASS=  2        FAIL=  2        SKIP=  1
 
-===== Memory Allocations Report =================================
-  Total mallocs:                0
-  Total frees:                  0
+  "test_set": "hooks_set",
+
+  "timestamp": "2025-12-23 16:41:10",
+
+  "tests": [
+
+    {
+
+      "test": "JSON: Should Pass",
+
+      "status": "PASS",
+
+      "duration_us": "448.000",
+
+      "message": ""
+
+    },
+
+    {
+
+      "test": "JSON: Should Fail",
+
+      "status": "FAIL",
+
+      "duration_us": "803.000",
+
+      "message": "Expected true, but was false
+    - 1 should not equal 0"
+
+    },
+
+    {
+
+      "test": "JSON: Should Expect Fail",
+
+      "status": "PASS",
+
+      "duration_us": "386.000",
+
+      "message": "Expected failure occurred"
+
+    },
+
+    {
+
+      "test": "JSON: Should Skip",
+
+      "status": "SKIP",
+
+      "duration_us": "324.000",
+
+      "message": "Testcase skipped
+    - This test is skipped"
+
+    },
+
+    {
+
+      "test": "JSON: Should Throw",
+
+      "status": "FAIL",
+
+      "duration_us": "334.000",
+
+      "message": "Explicit throw triggered
+    - This test is explicitly thrown"
+
+    }
+
+  ],
+
+  "summary": {
+
+    "total": 5,
+
+    "passed": 2,
+
+    "failed": 2,
+
+    "skipped": 1
+
+  }
+
+}
+
+================================================================================
+[2]     TESTS=  5        PASS=  2        FAIL=  2        SKIP=  1
+
+===== Memory Allocations Report ================================================
+  Total mallocs:               0
+  Total frees:                 0

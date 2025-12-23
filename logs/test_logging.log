@@ -1,0 +1,34 @@
+Test Source: test/test_logging.c
+[2] logging_set               :    5 : 2025-12-23  16:41:10                     
+================================================================================
+Testcase setup called, count: 1
+Running: add                                                    2.310 µs [PASS]
+Testcase teardown called, count: 1
+
+Testcase setup called, count: 2
+Running: divide                                                 1.500 µs [PASS]
+Testcase teardown called, count: 2
+
+Testcase setup called, count: 3
+Running: divide_by_zero_fails                                   2.428 µs [PASS]
+Testcase teardown called, count: 3
+
+Testcase setup called, count: 4
+Running: divide_by_zero_throws                                  2.016 µs [PASS]
+Testcase teardown called, count: 4
+
+Testcase setup called, count: 5
+Running: with_debug_logging                      
+  - Starting test with debug logging
+  - First check passed, a = 10
+  - Second check passed, b = 3.14
+  - Third check passed, str = hello
+                                                                8.787 µs [PASS]
+Testcase teardown called, count: 5
+
+================================================================================
+[2]     TESTS=  5        PASS=  5        FAIL=  0        SKIP=  0
+
+===== Memory Allocations Report ================================================
+  Total mallocs:               0
+  Total frees:                 0
