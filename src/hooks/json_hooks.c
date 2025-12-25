@@ -1,5 +1,5 @@
 /*
- * Sigma-Test
+ * SigmaTest
  * Copyright (c) 2025 David Boarman (BadKraft) and contributors
  * QuantumOverride [Q|]
  * ----------------------------------------------
@@ -22,7 +22,7 @@
  * SOFTWARE.
  * ----------------------------------------------
  * File: json_hooks.c
- * Description: Source file for JSON output hooks for Sigma-Test
+ * Description: Source file for JSON output hooks for SigmaTest
  */
 #include "hooks/json_hooks.h"
 #include <stdio.h>

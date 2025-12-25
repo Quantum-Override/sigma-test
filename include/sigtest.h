@@ -1,5 +1,5 @@
 /*
- * Sigma-Test
+ * SigmaTest
  * Copyright (c) 2025 David Boarman (BadKraft) and contributors
  * QuantumOverride [Q|]
  * ----------------------------------------------
@@ -22,34 +22,21 @@
  * SOFTWARE.
  * ----------------------------------------------
  * File: sigtest.h
- * Description: Header file for Sigma-Test core definitions and interfaces
+ * Description: Header file for SigmaTest core definitions and interfaces
  */
 #pragma once
 
 #include "core.h"
 #include "internal/memwrap.h"
 #include <stdarg.h>
-#include <stdio.h>
-#include <time.h>
 
 #include <sys/syscall.h>
 #include <unistd.h>
-
-#ifndef TRUE
-#define TRUE 1
-#endif
-#ifndef FALSE
-#define FALSE 0
-#endif
 
 struct st_case_s;
 struct st_set_s;
 struct st_hooks_s;
 struct st_logger_s;
-
-typedef void *object;
-typedef char *string;
-typedef struct timespec ts_time;
 
 typedef struct st_case_s *TestCase;
 typedef struct st_set_s *TestSet;
@@ -166,22 +153,6 @@ typedef struct st_assert_i {
 extern const st_assert_i Assert;
 
 /**
- * @brief Test case structure
- * @detail Encapsulates the name of the test and the test case function pointer
- */
-typedef struct st_case_s {
-   string name;
-   TestFunc test_func; /* Test function pointer */
-   int expect_fail;    /* Expect failure flag */
-   int expect_throw;   /* Expect throw flag */
-   struct {
-      TestState state;
-      string message;
-   } test_result;
-   TestCase next; /* Pointer to the next test case */
-} st_case_s;
-
-/**
  * @brief Logger structure for test set logging
  */
 typedef struct st_logger_s {
@@ -220,19 +191,19 @@ const char *st_version(void);
  * @param  name :the test name
  * @param  func :the test function
  */
-void testcase(string name, void (*func)(void));
+void testcase(string name, TestFunc func);
 /**
  * @brief Registers a testcase with fail expectation
  * @param  name :the test name
  * @param  func :the test function
  */
-void fail_testcase(string name, void (*func)(void));
+void fail_testcase(string name, TestFunc func);
 /**
  * @brief Registers a test case with expectation to throw
  * @param  name :the test name
  * @param  func :the test function
  */
-void testcase_throws(string name, void (*func)(void));
+void testcase_throws(string name, TestFunc func);
 /**
  * @brief Registers the test case setup function
  * @param  setup :the test case setup function

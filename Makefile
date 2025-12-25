@@ -1,4 +1,4 @@
-# Sigma-Test — Canonical Makefile
+# SigmaTest — Canonical Makefile
 # Silent, safe, professional. Everything works exactly as you expect.
 
 .SILENT:

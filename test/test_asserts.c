@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 /*
- * Test case for the new assert functions added to the IAssert interface
+ * Test set for the new assert functions added to the IAssert interface
  * in version 0.1.0.
  */
 

@@ -1,5 +1,5 @@
 /*
- * Sigma-Test
+ * SigmaTest
  * Copyright (c) 2025 David Boarman (BadKraft) and contributors
  * QuantumOverride [Q|]
  * ----------------------------------------------
@@ -22,15 +22,14 @@
  * SOFTWARE.
  * ----------------------------------------------
  * File: json_hooks.h
- * Description: Header file for JSON output hooks for Sigma-Test
+ * Description: Header file for JSON output hooks for SigmaTest
  */
 #ifndef JSON_HOOKS_H
 #define JSON_HOOKS_H
 
 #include "sigtest.h"
 
-struct JsonHookContext
-{
+struct JsonHookContext {
    int count;
    int verbose;
    ts_time start;

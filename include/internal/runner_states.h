@@ -1,5 +1,5 @@
 /*
- * Sigma-Test
+ * SigmaTest
  * Copyright (c) 2025 David Boarman (BadKraft) and contributors
  * QuantumOverride [Q|]
  * ----------------------------------------------
@@ -38,6 +38,8 @@ typedef enum {
    SETUP_TEST,
    START_TEST,
    EXECUTE_TEST,
+   FUZZING_INIT,
+   FUZZING_LOOP,
    HANDLE_EXCEPTION,
    END_TEST,
    TEARDOWN_TEST,

@@ -1,5 +1,5 @@
 /*
- * Sigma-Test
+ * SigmaTest
  * Copyright (c) 2025 David Boarman (BadKraft) and contributors
  * QuantumOverride [Q|]
  * ----------------------------------------------
@@ -22,7 +22,7 @@
  * SOFTWARE.
  * ----------------------------------------------
  * File: sigtest_cli.h
- * Description: Header file for Sigma-Test CLI definitions and interfaces
+ * Description: Header file for SigmaTest CLI definitions and interfaces
  */
 #ifndef SIGTEST_CLI_H
 #define SIGTEST_CLI_H
@@ -33,8 +33,7 @@
 #define MAX_TEMPLATE_LEN 64
 
 // Output log levels
-typedef enum
-{
+typedef enum {
    LOG_NONE,    // No logging
    LOG_MINIMAL, // Minimal logging
    LOG_VERBOSE, // Verbose logging
@@ -43,16 +42,14 @@ typedef enum
 // CLI state structure
 typedef struct
 {
-   enum
-   {
+   enum {
       START,
       TEST_SRC,
       DONE,
       ERROR,
       IGNORE,
    } state;
-   enum
-   {
+   enum {
       DEFAULT,
       SIMPLE,
       VERSION,

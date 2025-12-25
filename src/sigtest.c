@@ -1,5 +1,5 @@
 /*
- * Sigma-Test
+ * SigmaTest
  * Copyright (c) 2025 David Boarman (BadKraft) and contributors
  * QuantumOverride [Q|]
  * ----------------------------------------------
@@ -22,9 +22,10 @@
  * SOFTWARE.
  * ----------------------------------------------
  * File: sigtest.c
- * Description: Source file for Sigma-Test core interfaces and implementations
+ * Description: Source file for SigmaTest core interfaces and implementations
  */
 #include "sigtest.h"
+#include "fuzzing.h"
 #include "internal/logging.h"
 #include "internal/runner_states.h"
 #include <assert.h>
@@ -38,7 +39,7 @@
 #include <string.h> // 	for jmp_buf and related functions
 #include <strings.h>
 
-#define SIGMATEST_VERSION "1.00.1-pre1"
+#define SIGMATEST_VERSION "1.00.1-pre"
 
 // Global test set "registry"
 TestSet test_sets = NULL;
@@ -93,6 +94,29 @@ static void default_on_testcase_finish(void);
 static void default_on_testset_finished(void);
 // hooks registry
 static HookRegistry *hook_registry = NULL;
+
+/*
+ * Test case structure
+ * Encapsulates the name of the test and the test case function pointer
+ */
+typedef struct st_case_s {
+   string name;
+   TestFunc test_func; /* Test function pointer */
+   // encapsulate fuzzy test function pointer
+   union {
+      TestFunc test;  /* Regular test function */
+      FuzzyFunc fuzz; /* Fuzzy test function */
+   } func;
+   int expect_fail;    /* Expect failure flag */
+   int expect_throw;   /* Expect throw flag */
+   int is_fuzz;        /* Is fuzz test flag */
+   FuzzType fuzz_type; /* Fuzz input type */
+   struct {
+      TestState state;
+      string message;
+   } test_result;
+   TestCase next; /* Pointer to the next test case */
+} st_case_s;
 
 /*
  * hook_ctx_t - shared hook context structure
@@ -277,6 +301,30 @@ static string gen_equals_fail_msg(object expected, object actual, AssertType typ
       strncat(msg_buffer, user_msg, sizeof(msg_buffer) - strlen(msg_buffer) - 1);
    }
    return msg_buffer;
+}
+// format fuzz value for logging
+static void format_fuzz_value(FuzzType type, const void *ptr, char *buf, size_t bufsize) {
+   switch (type) {
+   case FUZZ_INT:
+      snprintf(buf, bufsize, "%d", *(const int *)ptr);
+      break;
+   case FUZZ_SIZE_T:
+      snprintf(buf, bufsize, "%zu", *(const size_t *)ptr);
+      break;
+   case FUZZ_FLOAT: {
+      float f = *(const float *)ptr;
+      if (isnan(f))
+         snprintf(buf, bufsize, "NAN");
+      else if (isinf(f))
+         snprintf(buf, bufsize, "%cINFINITY", f < 0 ? '-' : '+');
+      else
+         snprintf(buf, bufsize, "%.9g", f);
+      break;
+   }
+   case FUZZ_BYTE:
+      snprintf(buf, bufsize, "%d", (int)*(const signed char *)ptr);
+      break;
+   }
 }
 
 void set_test_context(TestState result, const string message) {
@@ -716,30 +764,16 @@ void testset(string name, ConfigFunc config, CleanupFunc cleanup) {
    test_sets = set;
    current_set = set;
 }
+
+static TestCase create_testcase(string);
 // Register test to test registry
 void testcase(string name, TestFunc func) {
    if (!current_set) {
       testset("default", NULL, NULL);
    }
 
-   TestCase tc = __real_malloc(sizeof(struct st_case_s));
-   if (!tc) {
-      writef("Failed to allocate memory for test case `%s`\n", name);
-      exit(EXIT_FAILURE);
-   }
-   tc->name = strdup(name);
-   if (!tc->name) {
-      writef("Failed to allocate memory for test case name `%s`\n", name);
-      __real_free(tc);
-
-      exit(EXIT_FAILURE); // cleanup_test_sets will handle freeing
-   }
-   tc->test_func = func;
-   tc->expect_fail = FALSE;
-   tc->expect_throw = FALSE;
-   tc->test_result.state = PASS;
-   tc->test_result.message = NULL;
-   tc->next = NULL;
+   TestCase tc = create_testcase(name);
+   tc->func.test = func;
 
    if (!current_set->cases) {
       current_set->cases = tc;
@@ -757,24 +791,9 @@ void fail_testcase(string name, void (*func)(void)) {
       testset("default", NULL, NULL);
    }
 
-   TestCase tc = __real_malloc(sizeof(struct st_case_s));
-   if (!tc) {
-      writef("Failed to allocate memory for test case `%s`\n", name);
-      exit(EXIT_FAILURE);
-   }
-   tc->name = strdup(name);
-   if (!tc->name) {
-      writef("Failed to allocate memory for test case name `%s`\n", name);
-      __real_free(tc);
-
-      exit(EXIT_FAILURE); // cleanup_test_sets will handle freeing
-   }
-   tc->test_func = func;
+   TestCase tc = create_testcase(name);
+   tc->func.test = func;
    tc->expect_fail = TRUE;
-   tc->expect_throw = FALSE;
-   tc->test_result.state = PASS; // Set to PASS initially, evaluated in main
-   tc->test_result.message = NULL;
-   tc->next = NULL;
 
    if (!current_set->cases) {
       current_set->cases = tc;
@@ -792,24 +811,9 @@ void testcase_throws(string name, void (*func)(void)) {
       testset("default", NULL, NULL);
    }
 
-   TestCase tc = __real_malloc(sizeof(struct st_case_s));
-   if (!tc) {
-      writef("Failed to allocate memory for test case `%s`\n", name);
-      exit(EXIT_FAILURE);
-   }
-   tc->name = strdup(name);
-   if (!tc->name) {
-      writef("Failed to allocate memory for test case name `%s`\n", name);
-      __real_free(tc);
-
-      exit(EXIT_FAILURE); // cleanup_test_sets will handle freeing
-   }
-   tc->test_func = func;
-   tc->expect_fail = FALSE;
+   TestCase tc = create_testcase(name);
+   tc->func.test = func;
    tc->expect_throw = TRUE;
-   tc->test_result.state = PASS; // Set to PASS initially, evaluated in main
-   tc->test_result.message = NULL;
-   tc->next = NULL;
 
    if (!current_set->cases) {
       current_set->cases = tc;
@@ -821,6 +825,28 @@ void testcase_throws(string name, void (*func)(void)) {
 
    current_set->count++;
 }
+// Register a fuzz test case
+void fuzz_testcase(string name, FuzzyFunc func, FuzzType type) {
+   if (!current_set) {
+      testset("default", NULL, NULL);
+   }
+
+   TestCase tc = create_testcase(name);
+   tc->is_fuzz = TRUE;
+   tc->func.fuzz = func;
+   tc->fuzz_type = type;
+
+   if (!current_set->cases) {
+      current_set->cases = tc;
+      current_set->tail = tc;
+   } else {
+      current_set->tail->next = tc;
+      current_set->tail = tc;
+   }
+
+   current_set->count++;
+}
+
 // Setup test case
 void setup_testcase(CaseOp setup) {
    if (current_set) {
@@ -832,6 +858,28 @@ void teardown_testcase(CaseOp teardown) {
    if (current_set) {
       current_set->teardown = teardown;
    }
+}
+// Create a test case with common defaults
+static TestCase create_testcase(string name) {
+   TestCase tc = __real_malloc(sizeof(struct st_case_s));
+   if (!tc) {
+      writef("Failed to allocate memory for test case `%s`\n", name);
+      exit(EXIT_FAILURE);
+   }
+   tc->name = strdup(name);
+   if (!tc->name) {
+      writef("Failed to allocate memory for test case name `%s`\n", name);
+      __real_free(tc);
+      exit(EXIT_FAILURE);
+   }
+   tc->is_fuzz = FALSE;
+   tc->func.test = NULL;
+   tc->expect_fail = FALSE;
+   tc->expect_throw = FALSE;
+   tc->test_result.state = PASS;
+   tc->test_result.message = NULL;
+   tc->next = NULL;
+   return tc;
 }
 
 // Register test hooks
@@ -1085,6 +1133,7 @@ static RunnerState before_test(ST_Hooks);
 static RunnerState setup_test(TestSet);
 static RunnerState start_test(ST_Hooks);
 static RunnerState execute_test(TestCase, jmp_buf);
+static RunnerState execute_fuzzing(TestCase, jmp_buf, const void *, size_t, size_t);
 static RunnerState end_test(ST_Hooks);
 static RunnerState teardown_test(TestSet);
 static RunnerState after_test(ST_Hooks);
@@ -1164,6 +1213,45 @@ int run_tests(TestSet sets, ST_Hooks test_hooks) {
          break;
       case EXECUTE_TEST:
          state = execute_test(tc, jmpbuffer);
+
+         break;
+      case FUZZING_INIT:
+         // FUZZ TEST EXECUTION
+         const void *dataset;
+         size_t count;
+         size_t elem_size;
+
+         switch (tc->fuzz_type) {
+         case FUZZ_INT:
+            dataset = fuzz_int_values;
+            count = fuzz_int_count;
+            elem_size = sizeof(int);
+
+            break;
+         case FUZZ_SIZE_T:
+            dataset = fuzz_size_t_values;
+            count = fuzz_size_t_count;
+            elem_size = sizeof(size_t);
+
+            break;
+         case FUZZ_FLOAT:
+            dataset = fuzz_float_values;
+            count = fuzz_float_count;
+            elem_size = sizeof(float);
+
+            break;
+         case FUZZ_BYTE:
+            dataset = fuzz_byte_values;
+            count = fuzz_byte_count;
+            elem_size = sizeof(signed char);
+
+            break;
+         default:
+            tc->test_result.state = FAIL;
+            tc->test_result.message = strdup("Invalid FuzzType in fuzz test");
+            return END_TEST; // or your next state
+         }
+         state = execute_fuzzing(tc, jmpbuffer, dataset, count, elem_size);
 
          break;
       case END_TEST:
@@ -1332,10 +1420,53 @@ static RunnerState start_test(ST_Hooks hooks) {
 }
 static RunnerState execute_test(TestCase tc, jmp_buf jmpbuffer) {
    if (setjmp(jmpbuffer) == 0) {
-      tc->test_func();
+      if (!tc->is_fuzz) {
+         tc->func.test();
+      } else {
+         return FUZZING_INIT;
+      }
    } else {
       // handle exception
    }
+   return END_TEST;
+}
+static RunnerState execute_fuzzing(TestCase tc, jmp_buf jmpbuffer, const void *dataset, size_t count, size_t elem_size) {
+   int failed_count = 0;
+   char val_buf[64];
+
+   for (size_t i = 0; i < count; ++i) {
+      const void *input = (const char *)dataset + (i * elem_size);
+
+      format_fuzz_value(tc->fuzz_type, input, val_buf, sizeof(val_buf));
+      writef("value = %-10.3s", val_buf);
+
+      if (setjmp(jmpbuffer) == 0) {
+         tc->func.fuzz(input);
+         writelnf("Okay");
+      } else {
+         const char *msg = tc->test_result.message ? tc->test_result.message : "Unknown failure";
+         writelnf("Failed:\n  - %s", msg);
+         failed_count++;
+
+         // Reset message for next iteration
+         if (tc->test_result.message) {
+            tc->test_result.message = NULL;
+         }
+      }
+   }
+
+   // Final result for the fuzz test case
+   if (failed_count == 0) {
+      tc->test_result.state = PASS;
+      tc->test_result.message = NULL;
+   } else {
+      tc->test_result.state = FAIL;
+      char summary[128];
+      snprintf(summary, sizeof(summary),
+               "%ld of %zu fuzz iterations passed", count - failed_count, count);
+      tc->test_result.message = strdup(summary);
+   }
+
    return END_TEST;
 }
 static RunnerState end_test(ST_Hooks hooks) {

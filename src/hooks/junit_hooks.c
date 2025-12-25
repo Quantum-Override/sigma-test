@@ -1,5 +1,5 @@
 /*
- * Sigma-Test
+ * SigmaTest
  * Copyright (c) 2025 David Boarman (BadKraft) and contributors
  * QuantumOverride [Q|]
  * ----------------------------------------------
@@ -22,7 +22,7 @@
  * SOFTWARE.
  * ----------------------------------------------
  * File: junit_hooks.c
- * Description: Source file for JUnit XML output hooks for Sigma-Test
+ * Description: Source file for JUnit XML output hooks for SigmaTest
  * Goals:
  *    - Generates standards-compliant JUnit XML output for CI/CD integration
  *    - Fully validated against xmllint for well-formed XML structure
@@ -68,167 +68,167 @@ struct st_hooks_s junit_hooks = {
 };
 
 void junit_before_set(const TestSet set, object context) {
-  struct JunitHookContext *ctx = context;
-  ctx->set = set;
+   struct JunitHookContext *ctx = context;
+   ctx->set = set;
 
-  get_timestamp(ctx->timestamp, "%Y-%m-%dT%H:%M:%S");
-  get_hostname(ctx->hostname, sizeof(ctx->hostname));
+   get_timestamp(ctx->timestamp, "%Y-%m-%dT%H:%M:%S");
+   get_hostname(ctx->hostname, sizeof(ctx->hostname));
 
-  junit_append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-  junit_append("<testsuites>\n");
-  junit_append("  <testsuite name=\"%s\" timestamp=\"%s\" hostname=\"%s\" "
-               "tests=\"%%d\" failures=\"%%d\" skipped=\"%%d\" time=\"0.000\">\n",
-               set->name, ctx->timestamp, ctx->hostname);
+   junit_append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+   junit_append("<testsuites>\n");
+   junit_append("  <testsuite name=\"%s\" timestamp=\"%s\" hostname=\"%s\" "
+                "tests=\"%%d\" failures=\"%%d\" skipped=\"%%d\" time=\"0.000\">\n",
+                set->name, ctx->timestamp, ctx->hostname);
 }
 
 void junit_on_test_result(const TestSet set, const TestCase tc, object context) {
-  struct JunitHookContext *ctx = context;
+   struct JunitHookContext *ctx = context;
 
-  // Console color output
-  if (ctx->verbose && isatty(fileno(stdout))) {
-    // prefer using switch-case for clarity
-    switch (tc->test_result.state) {
-    case PASS:
-      printf("%s[PASS]%s %s\n", COLOR_GREEN, COLOR_RESET, tc->name);
-      break;
-    case FAIL:
-      printf("%s[FAIL]%s %s\n", COLOR_RED, COLOR_RESET, tc->name);
-      break;
-    case SKIP:
-      printf("%s[SKIP]%s %s\n", COLOR_YELLOW, COLOR_RESET, tc->name);
-      break;
-    default:
-      printf("[UNKNOWN] test state: %s\n", tc->name);
-      break;
-    }
-  }
+   // Console color output
+   if (ctx->verbose && isatty(fileno(stdout))) {
+      // prefer using switch-case for clarity
+      switch (tc->test_result.state) {
+      case PASS:
+         printf("%s[PASS]%s %s\n", COLOR_GREEN, COLOR_RESET, tc->name);
+         break;
+      case FAIL:
+         printf("%s[FAIL]%s %s\n", COLOR_RED, COLOR_RESET, tc->name);
+         break;
+      case SKIP:
+         printf("%s[SKIP]%s %s\n", COLOR_YELLOW, COLOR_RESET, tc->name);
+         break;
+      default:
+         printf("[UNKNOWN] test state: %s\n", tc->name);
+         break;
+      }
+   }
 
-  // Append test case result to JUnit XML
-  junit_append("    <testcase name=\"%s\" classname=\"%s\">\n", tc->name, set->name);
+   // Append test case result to JUnit XML
+   junit_append("    <testcase name=\"%s\" classname=\"%s\">\n", tc->name, set->name);
 
-  if (tc->test_result.state == FAIL) {
-    char *escaped = xml_escape(tc->test_result.message ? tc->test_result.message : "Unknown failure");
-    junit_append("      <failure message=\"%s\"/>\n", escaped);
-    free(escaped);
-    ctx->failures++;
-  } else if (tc->test_result.state == SKIP) {
-    junit_append("      <skipped/>\n");
-    ctx->skipped++;
-  }
+   if (tc->test_result.state == FAIL) {
+      char *escaped = xml_escape(tc->test_result.message ? tc->test_result.message : "Unknown failure");
+      junit_append("      <failure message=\"%s\"/>\n", escaped);
+      free(escaped);
+      ctx->failures++;
+   } else if (tc->test_result.state == SKIP) {
+      junit_append("      <skipped/>\n");
+      ctx->skipped++;
+   }
 
-  junit_append("    </testcase>\n");
-  ctx->total_tests++;
+   junit_append("    </testcase>\n");
+   ctx->total_tests++;
 }
 
 void junit_after_set(const TestSet set, object context) {
-  struct JunitHookContext *ctx = context;
+   struct JunitHookContext *ctx = context;
 
-  // Close the testsuite
-  junit_append("  </testsuite>\n");
-  junit_append("</testsuites>\n");
+   // Close the testsuite
+   junit_append("  </testsuite>\n");
+   junit_append("</testsuites>\n");
 
-  // Now go back and fix the placeholder line (the one with %%d)
-  char *suite_line = strstr(junit_xml_buffer, "<testsuite");
-  if (suite_line) {
-    char fixed_line[1024];
-    snprintf(fixed_line, sizeof(fixed_line),
-             "<testsuites>\n  <testsuite name=\"%s\" timestamp=\"%s\" hostname=\"%s\" "
-             "tests=\"%d\" failures=\"%d\" skipped=\"%d\" time=\"0.000\">\n",
-             set->name, ctx->timestamp, ctx->hostname,
-             ctx->total_tests, ctx->failures, ctx->skipped);
+   // Now go back and fix the placeholder line (the one with %%d)
+   char *suite_line = strstr(junit_xml_buffer, "<testsuite");
+   if (suite_line) {
+      char fixed_line[1024];
+      snprintf(fixed_line, sizeof(fixed_line),
+               "<testsuites>\n  <testsuite name=\"%s\" timestamp=\"%s\" hostname=\"%s\" "
+               "tests=\"%d\" failures=\"%d\" skipped=\"%d\" time=\"0.000\">\n",
+               set->name, ctx->timestamp, ctx->hostname,
+               ctx->total_tests, ctx->failures, ctx->skipped);
 
-    // Overwrite the old line
-    size_t len = strlen(fixed_line);
-    memcpy(suite_line, fixed_line, len > 1024 ? 1024 : len);
-  }
+      // Overwrite the old line
+      size_t len = strlen(fixed_line);
+      memcpy(suite_line, fixed_line, len > 1024 ? 1024 : len);
+   }
 
-  // Final output
-  set->logger->log("%s", junit_xml_buffer);
+   // Final output
+   set->logger->log("%s", junit_xml_buffer);
 
-  ctx->set = NULL;
+   ctx->set = NULL;
 }
 
 // Retrieve the hostname of the current machine
 static int get_hostname(char *buffer, size_t size) {
-  if (gethostname(buffer, size) != 0) {
-    strncpy(buffer, "localhost", size);
-    return -1;
-  }
+   if (gethostname(buffer, size) != 0) {
+      strncpy(buffer, "localhost", size);
+      return -1;
+   }
 
-  return 0;
+   return 0;
 }
 
 // Escape special XML characters in a string
 static char *xml_escape(const char *input) {
-  if (!input)
-    return strdup("");
+   if (!input)
+      return strdup("");
 
-  size_t len = strlen(input);
-  size_t needed = len;
-  for (size_t i = 0; i < len; i++) {
-    switch (input[i]) {
-    case '&':
-      needed += 4;
-      break; // &amp;
-    case '<':
-      needed += 3;
-      break; // &lt;
-    case '>':
-      needed += 3;
-      break; // &gt;
-    case '"':
-      needed += 5;
-      break; // &quot;
-    case '\'':
-      needed += 5;
-      break; // &apos;
-    }
-  }
+   size_t len = strlen(input);
+   size_t needed = len;
+   for (size_t i = 0; i < len; i++) {
+      switch (input[i]) {
+      case '&':
+         needed += 4;
+         break; // &amp;
+      case '<':
+         needed += 3;
+         break; // &lt;
+      case '>':
+         needed += 3;
+         break; // &gt;
+      case '"':
+         needed += 5;
+         break; // &quot;
+      case '\'':
+         needed += 5;
+         break; // &apos;
+      }
+   }
 
-  char *dst = __real_malloc(needed + 1);
-  if (!dst)
-    return NULL;
+   char *dst = __real_malloc(needed + 1);
+   if (!dst)
+      return NULL;
 
-  char *out = dst;
-  for (size_t i = 0; i < len; i++) {
-    switch (input[i]) {
-    case '&':
-      out += sprintf(out, "&amp;");
-      break;
-    case '<':
-      out += sprintf(out, "&lt;");
-      break;
-    case '>':
-      out += sprintf(out, "&gt;");
-      break;
-    case '"':
-      out += sprintf(out, "&quot;");
-      break;
-    case '\'':
-      out += sprintf(out, "&apos;");
-      break;
-    default:
-      *out++ = input[i];
-      break;
-    }
-  }
-  *out = '\0';
-  return dst;
+   char *out = dst;
+   for (size_t i = 0; i < len; i++) {
+      switch (input[i]) {
+      case '&':
+         out += sprintf(out, "&amp;");
+         break;
+      case '<':
+         out += sprintf(out, "&lt;");
+         break;
+      case '>':
+         out += sprintf(out, "&gt;");
+         break;
+      case '"':
+         out += sprintf(out, "&quot;");
+         break;
+      case '\'':
+         out += sprintf(out, "&apos;");
+         break;
+      default:
+         *out++ = input[i];
+         break;
+      }
+   }
+   *out = '\0';
+   return dst;
 }
 
 // Append formatted XML to the JUnit report
 static void junit_append(const char *fmt, ...) {
-  va_list args;
-  va_start(args, fmt);
-  int written = vsnprintf(junit_xml_buffer + junit_xml_used,
-                          JUNIT_XML_BUFFER_SIZE - junit_xml_used,
-                          fmt, args);
-  va_end(args);
+   va_list args;
+   va_start(args, fmt);
+   int written = vsnprintf(junit_xml_buffer + junit_xml_used,
+                           JUNIT_XML_BUFFER_SIZE - junit_xml_used,
+                           fmt, args);
+   va_end(args);
 
-  if (written < 0 || (size_t)written >= JUNIT_XML_BUFFER_SIZE - junit_xml_used) {
-    // Truncate gracefully — never overflow
-    junit_xml_buffer[JUNIT_XML_BUFFER_SIZE - 1] = '\0';
-  } else {
-    junit_xml_used += written;
-  }
+   if (written < 0 || (size_t)written >= JUNIT_XML_BUFFER_SIZE - junit_xml_used) {
+      // Truncate gracefully — never overflow
+      junit_xml_buffer[JUNIT_XML_BUFFER_SIZE - 1] = '\0';
+   } else {
+      junit_xml_used += written;
+   }
 }

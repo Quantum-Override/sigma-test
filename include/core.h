@@ -1,5 +1,5 @@
 /*
- * Sigma-Test
+ * SigmaTest
  * Copyright (c) 2025 David Boarman (BadKraft) and contributors
  * QuantumOverride [Q|]
  * ----------------------------------------------
@@ -26,6 +26,9 @@
  */
 #pragma once
 
+#include <stdio.h>
+#include <time.h>
+
 // Output debug levels
 typedef enum {
    DBG_DEBUG,   // Debug level logging
@@ -34,3 +37,14 @@ typedef enum {
    DBG_ERROR,   // Error (non-fatal) level logging
    DBG_FATAL,   // Fatal error level logging
 } DebugLevel;
+
+#ifndef TRUE
+#define TRUE 1
+#endif
+#ifndef FALSE
+#define FALSE 0
+#endif
+
+typedef void *object;
+typedef char *string;
+typedef struct timespec ts_time;

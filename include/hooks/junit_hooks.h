@@ -1,5 +1,5 @@
 /*
- * Sigma-Test
+ * SigmaTest
  * Copyright (c) 2025 David Boarman (BadKraft) and contributors
  * QuantumOverride [Q|]
  * ----------------------------------------------
@@ -22,7 +22,7 @@
  * SOFTWARE.
  * ----------------------------------------------
  * File: junit_hooks.h
- * Description: Header file for JUnit output hooks for Sigma-Test
+ * Description: Header file for JUnit output hooks for SigmaTest
  *    - Generates standards-compliant JUnit XML output for CI/CD integration
  *    - Fully validated against xmllint for well-formed XML structure
  *    - Compatible with Jenkins, GitLab CI, GitHub Actions, and other CI platforms
@@ -39,13 +39,13 @@
 #include "sigtest.h"
 
 struct JunitHookContext {
-  int verbose;
-  char timestamp[32];
-  char hostname[256];
-  int total_tests;
-  int failures;
-  int skipped;
-  TestSet set;
+   int verbose;
+   char timestamp[32];
+   char hostname[256];
+   int total_tests;
+   int failures;
+   int skipped;
+   TestSet set;
 };
 
 extern struct st_hooks_s junit_hooks;
