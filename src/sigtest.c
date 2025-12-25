@@ -952,7 +952,13 @@ static void default_on_test_result(const TestSet set, const TestCase tc, object 
    char result_buf[64];
    snprintf(result_buf, sizeof(result_buf), "%.3f µs [%s]", elapsed, state_str);
 
+   if (tc->test_result.state == FAIL && tc->test_result.message) {
+      /* print failure message indented */
+      fwritelnf(set->log_stream, "\n  - %s", tc->test_result.message);
+      ctx->had_debug = 1;
+   }
    if (!ctx->had_debug && ctx->ran_no_newline) {
+
       /* No debug output occurred; append result to the Running line. Use stored running_len. */
       int pad = 80 - (ctx->running_len + (int)strlen(result_buf));
       if (pad < 0)
@@ -962,10 +968,10 @@ static void default_on_test_result(const TestSet set, const TestCase tc, object 
          fputc(' ', set->log_stream);
       fprintf(set->log_stream, "%s\n", result_buf);
    } else {
-      if (tc->test_result.state == FAIL && tc->test_result.message) {
-         /* print failure message indented */
-         fwritelnf(set->log_stream, "  - %s", tc->test_result.message);
-      }
+      // if (tc->test_result.state == FAIL && tc->test_result.message) {
+      //    /* print failure message indented */
+      //    fwritelnf(set->log_stream, "  - %s", tc->test_result.message);
+      // }
       /* right-justify result at column 80 on its own line */
       int pad = 80 - (int)strlen(result_buf);
       if (pad < 0)

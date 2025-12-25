@@ -75,6 +75,20 @@ static void test_skip(void) {
    Assert.skip("Trigger test case skip");
 }
 
+// test cases - various failing assertions
+static void test_assert_int_equal_fail(void) {
+   int expected = 5, actual = 3;
+   Assert.areEqual(&expected, &actual, INT, "%d should equal %d", expected, actual);
+}
+static void test_assert_float_equal_fail(void) {
+   float expected = 5.0f, actual = 3.0f;
+   Assert.areEqual(&expected, &actual, FLOAT, "%.2f should equal %.2f", expected, actual);
+}
+static void test_assert_pointer_equal_fail(void) {
+   int a = 5, b = 5;
+   Assert.areEqual(&a, &b, PTR, "Pointers %p and %p should be equal", &a, &b);
+}
+
 // Register test cases
 __attribute__((constructor)) void init_asserts_tests(void) {
    testset("asserts_set", set_config, NULL);
@@ -97,4 +111,8 @@ __attribute__((constructor)) void init_asserts_tests(void) {
 
    fail_testcase("Assert Fail Test Case", test_fail);
    fail_testcase("Assert Skip Test Case", test_skip);
+
+   testcase("Assert Int Equal Fail", test_assert_int_equal_fail);
+   testcase("Assert Float Equal Fail", test_assert_float_equal_fail);
+   testcase("Assert Pointer Equal Fail", test_assert_pointer_equal_fail);
 }

@@ -1,23 +1,25 @@
 Test Source: test/test_controls.c
-[2] constrols_set             :    6 : 2025-12-23  16:41:10                     
+[2] constrols_set             :    6 : 2025-12-24  19:09:17                     
 ================================================================================
 Testcase setup called, count: 1
-Running: float_fail                                             7.466 µs [PASS]
+Running: float_fail                                            17.408 µs [PASS]
 Testcase teardown called, count: 1
 Testcase setup called, count: 2
-Running: string_fail                                            1.606 µs [PASS]
+Running: string_fail                                            4.035 µs [PASS]
 Testcase teardown called, count: 2
 Testcase setup called, count: 3
-Running: expect_fail_passes                                     1.908 µs [PASS]
+Running: expect_fail_passes                                     3.468 µs [PASS]
 Testcase teardown called, count: 3
 Testcase setup called, count: 4
-Running: complex_failure                                        2.152 µs [PASS]
+Running: complex_failure                                        4.841 µs [PASS]
 Testcase teardown called, count: 4
 Testcase setup called, count: 5
-Running: test_expect_exception                                  1.784 µs [PASS]
+Running: test_expect_exception                                  2.968 µs [PASS]
 Testcase teardown called, count: 5
 Testcase setup called, count: 6
-Running: test_expect_throw                                      1.419 µs [FAIL]
+Running: test_expect_throw                       
+  - Expected throw but passed
+                                                                2.615 µs [FAIL]
 Testcase teardown called, count: 6
 ================================================================================
 [2]     TESTS=  6        PASS=  5        FAIL=  1        SKIP=  0
