@@ -53,6 +53,7 @@ struct st_hooks_s json_hooks = {
     .on_error = json_on_error,
     .on_test_result = json_on_test_result,
     .on_set_summary = json_on_set_summary,
+    .on_debug_log = NULL,
     .context = NULL,
 };
 
@@ -62,22 +63,22 @@ void json_before_set(const TsInfo set, tc_context *context) {
 
    char timestamp[32];
    get_timestamp(timestamp, "%Y-%m-%d %H:%M:%S");
-   context->info.logger->log("{\n");
-   context->info.logger->log("  \"test_set\": \"%s\",\n", set->name);
-   context->info.logger->log("  \"timestamp\": \"%s\",\n", timestamp);
-   context->info.logger->log("  \"tests\": [\n");
+   context->info.logger->log("{");
+   context->info.logger->log("  \"test_set\": \"%s\",", set->name);
+   context->info.logger->log("  \"timestamp\": \"%s\",", timestamp);
+   context->info.logger->log("  \"tests\": [");
 }
 void json_after_set(const TsInfo set, tc_context *context) {
-   context->info.logger->log("  ],\n");
-   context->info.logger->log("  \"summary\": {\n");
-   context->info.logger->log("    \"total\": %d,\n", set->count);
-   context->info.logger->log("    \"passed\": %d,\n", set->passed);
-   context->info.logger->log("    \"failed\": %d,\n", set->failed);
-   context->info.logger->log("    \"skipped\": %d,\n", set->skipped);
-   context->info.logger->log("    \"total_mallocs\": %zu,\n", _sigtest_alloc_count);
-   context->info.logger->log("    \"total_frees\": %zu\n", _sigtest_free_count);
-   context->info.logger->log("  }\n");
-   context->info.logger->log("}\n");
+   context->info.logger->log("  ],");
+   context->info.logger->log("  \"summary\": {");
+   context->info.logger->log("    \"total\": %d,", set->count);
+   context->info.logger->log("    \"passed\": %d,", set->passed);
+   context->info.logger->log("    \"failed\": %d,", set->failed);
+   context->info.logger->log("    \"skipped\": %d,", set->skipped);
+   context->info.logger->log("    \"total_mallocs\": %zu,", _sigtest_alloc_count);
+   context->info.logger->log("    \"total_frees\": %zu", _sigtest_free_count);
+   context->info.logger->log("  }");
+   context->info.logger->log("}");
 }
 void json_before_test(tc_context *context) {
    // Placeholder for any setup before each test
@@ -167,16 +168,16 @@ void json_on_test_result(const TsInfo set, tc_context *context) {
    }
    *dst = '\0';
 
-   context->info.logger->log("    {\n");
-   context->info.logger->log("      \"test\": \"%s\",\n", set->tc_info->name);
-   context->info.logger->log("      \"status\": \"%s\",\n", status);
-   context->info.logger->log("      \"duration_us\": %.3f,\n", elapsed_ms * 1000.0);
-   context->info.logger->log("      \"message\": \"%s\"\n", escaped_message);
-   context->info.logger->log("    }%s\n", set->tc_info->has_next ? "," : "");
+   context->info.logger->log("    {");
+   context->info.logger->log("      \"test\": \"%s\",", set->tc_info->name);
+   context->info.logger->log("      \"status\": \"%s\",", status);
+   context->info.logger->log("      \"duration_us\": %.3f,", elapsed_ms * 1000.0);
+   context->info.logger->log("      \"message\": \"%s\"", escaped_message);
+   context->info.logger->log("    }%s", set->tc_info->has_next ? "," : "");
 }
 
 void json_on_set_summary(const TsInfo set, tc_context *context, st_summary *summary) {
-   (void)set; // unused
+   (void)set;     // unused
    (void)context; // unused
    (void)summary; // unused
    // Summary is handled in JSON output in after_set

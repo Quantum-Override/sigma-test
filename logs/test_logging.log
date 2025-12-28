@@ -1,20 +1,20 @@
 Test Source: test/test_logging.c
-[2] logging_set               :    5 : 2025-12-25  11:33:29                     
+[2] logging_set               :    5 : 2025-12-28  13:42:31                     
 ================================================================================
 Testcase setup called, count: 1
-Running: add                                                    3.193 µs [PASS]
+Running: add                                                 3035.000 µs [PASS]
 Testcase teardown called, count: 1
 
 Testcase setup called, count: 2
-Running: divide                                                 2.468 µs [PASS]
+Running: divide                                              2490.000 µs [PASS]
 Testcase teardown called, count: 2
 
 Testcase setup called, count: 3
-Running: divide_by_zero_fails                                   3.430 µs [PASS]
+Running: divide_by_zero_fails                                3918.000 µs [PASS]
 Testcase teardown called, count: 3
 
 Testcase setup called, count: 4
-Running: divide_by_zero_throws                                  2.803 µs [PASS]
+Running: divide_by_zero_throws                               2658.000 µs [PASS]
 Testcase teardown called, count: 4
 
 Testcase setup called, count: 5
@@ -23,12 +23,9 @@ Running: with_debug_logging
   - First check passed, a = 10
   - Second check passed, b = 3.14
   - Third check passed, str = hello
-                                                               13.410 µs [PASS]
+
+                                                            12651.000 µs [PASS]
 Testcase teardown called, count: 5
 
 ================================================================================
 [2]     TESTS=  5        PASS=  5        FAIL=  0        SKIP=  0
-
-===== Memory Allocations Report ================================================
-  Total mallocs:               0
-  Total frees:                 0

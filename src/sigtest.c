@@ -948,17 +948,30 @@ static void default_before_test(tc_context *ctx) {
    (void)*ctx; // unused
    default_ctx.info.count++;
 }
+static void append_to_buffer(tc_context *ctx, const char *str) {
+   size_t len = strlen(str);
+   if (ctx->buffer_used + len >= ctx->buffer_size) {
+      ctx->buffer_size = (ctx->buffer_size + len + 1024) & ~1023; // round up to 1024
+      ctx->output_buffer = __real_realloc(ctx->output_buffer, ctx->buffer_size);
+   }
+   memcpy(ctx->output_buffer + ctx->buffer_used, str, len);
+   ctx->buffer_used += len;
+}
 static void default_on_start_test(tc_context *ctx) {
-   (void)*ctx; // unused
-   if (sys_gettime(&default_ctx.info.start) == -1) {
+   if (sys_gettime(&ctx->test_start) == -1) {
       fwritelnf(stderr, "Error: Failed to get system start time");
       exit(EXIT_FAILURE);
    }
    // zero out the end time
-   default_ctx.info.end = (ts_time){0, 0};
+   ctx->info.end = (ts_time){0, 0};
+
+   if (!ctx->output_buffer) {
+      ctx->buffer_size = 2048;
+      ctx->output_buffer = __real_malloc(ctx->buffer_size);
+   }
+   ctx->buffer_used = 0;
 
    TestCase tc = current_set ? current_set->current : NULL;
-   // Logger logger = current_set ? current_set->logger : NULL;
 
    (void)set_started; /* header is printed in before_set */
    if (tc) {
@@ -975,8 +988,7 @@ static void default_on_start_test(tc_context *ctx) {
    }
 }
 static void default_on_end_test(tc_context *ctx) {
-   (void)*ctx; // unused
-   if (sys_gettime(&default_ctx.info.end) == -1) {
+   if (sys_gettime(&ctx->info.end) == -1) {
       fwritelnf(stderr, "Error: Failed to get system end time");
       exit(EXIT_FAILURE);
    }
@@ -989,19 +1001,20 @@ static void default_after_test(tc_context *ctx) {
    default_ctx.info.count--;
 }
 static void default_on_test_result(const TsInfo ts, tc_context *ctx) {
-   (void)*ctx; // unused
    if (!ts || !ts->tc_info)
       return;
 
-   double elapsed = get_elapsed_ms(&default_ctx.info.start, &default_ctx.info.end);
+   double elapsed = get_elapsed_ms(&ctx->test_start, &ctx->info.end);
    const char *state_str = TEST_STATES[ts->tc_info->result.state];
 
    char result_buf[64];
-   snprintf(result_buf, sizeof(result_buf), "%.3f µs [%s]", elapsed, state_str);
+   snprintf(result_buf, sizeof(result_buf), "%.3f µs [%s]", elapsed * 1000.0, state_str);
 
    if (ts->tc_info->result.state == FAIL && ts->tc_info->result.message) {
-      /* print failure message indented */
-      fwritelnf(current_set->log_stream, "\n  - %s", ts->tc_info->result.message);
+      /* append failure message indented */
+      char msg_buf[512];
+      snprintf(msg_buf, sizeof(msg_buf), "\n  - %s", ts->tc_info->result.message);
+      append_to_buffer(ctx, msg_buf);
       current_tc->had_debug = 1;
    }
    if (!current_tc->had_debug && current_tc->ran_no_newline) {
@@ -1010,26 +1023,47 @@ static void default_on_test_result(const TsInfo ts, tc_context *ctx) {
       int pad = 80 - (current_tc->running_len + (int)strlen(result_buf));
       if (pad < 0)
          pad = 0;
-      /* print padding and result, then newline */
-      for (int i = 0; i < pad; ++i)
-         fputc(' ', current_set->log_stream);
-      fprintf(current_set->log_stream, "%s\n", result_buf);
+      /* append padding and result, then newline */
+      char pad_str[81];
+      memset(pad_str, ' ', pad);
+      pad_str[pad] = '\0';
+      append_to_buffer(ctx, pad_str);
+      append_to_buffer(ctx, result_buf);
+      append_to_buffer(ctx, "\n");
    } else {
-      // if (tc->test_result.state == FAIL && tc->test_result.message) {
-      //    /* print failure message indented */
-      //    fwritelnf(set->log_stream, "  - %s", tc->test_result.message);
-      // }
       /* right-justify result at column 80 on its own line */
       int pad = 80 - (int)strlen(result_buf);
       if (pad < 0)
          pad = 0;
-      fwritelnf(current_set->log_stream, "%*s%s", pad, "", result_buf);
+      char pad_str[81];
+      memset(pad_str, ' ', pad);
+      pad_str[pad] = '\0';
+      append_to_buffer(ctx, "\n");
+      append_to_buffer(ctx, pad_str);
+      append_to_buffer(ctx, result_buf);
+      append_to_buffer(ctx, "\n");
+   }
+
+   // Flush the buffer
+   if (ctx->output_buffer && ctx->buffer_used > 0) {
+      FILE *stream = (current_set && current_set->log_stream) ? current_set->log_stream : stdout;
+      fwrite(ctx->output_buffer, 1, ctx->buffer_used, stream);
+      fflush(stream);
    }
 
    /* reset flags for next test */
    current_tc->ran_no_newline = 0;
    current_tc->had_debug = 0;
    current_tc->running_len = 0;
+}
+static void default_on_debug_log(tc_context *ctx, DebugLevel level, const char *fmt, ...) {
+   va_list args;
+   va_start(args, fmt);
+   char buf[2048];
+   vsnprintf(buf, sizeof(buf), fmt, args);
+   va_end(args);
+   append_to_buffer(ctx, buf);
+   current_tc->had_debug = 1;
 }
 static void default_on_error(const char *message, tc_context *ctx) {
    (void)*ctx;    // unused
@@ -1084,6 +1118,7 @@ static const st_hooks_s default_hooks = {
     .after_test = default_after_test,
     .on_error = default_on_error,
     .on_test_result = default_on_test_result,
+    .on_debug_log = default_on_debug_log,
     .context = &default_ctx,
 };
 
@@ -1566,14 +1601,13 @@ static RunnerState after_set(ST_Hooks hooks, TestSet set,
 
    /* Emit per-set summary */
    st_summary summary = {
-      .sequence = sequence,
-      .tc_total = tc_total,
-      .tc_passed = tc_passed,
-      .tc_failed = tc_failed,
-      .tc_skipped = tc_skipped,
-      .total_mallocs = _sigtest_alloc_count,
-      .total_frees = _sigtest_free_count
-   };
+       .sequence = sequence,
+       .tc_total = tc_total,
+       .tc_passed = tc_passed,
+       .tc_failed = tc_failed,
+       .tc_skipped = tc_skipped,
+       .total_mallocs = _sigtest_alloc_count,
+       .total_frees = _sigtest_free_count};
    if (hooks && hooks->on_set_summary) {
       hooks->on_set_summary((TsInfo)&current_set->info, hooks->context, &summary);
    } else {
@@ -1617,14 +1651,21 @@ static int runner_done(TestSet set) {
 
 #if 1 // Region: Logging functions with formatted test ouput
 static void flog_debug(DebugLevel level, FILE *stream, const char *fmt, ...) {
-   va_list args;
-   va_start(args, fmt);
-
-   fprintf(stream, "[%s] ", DBG_LEVELS[level]);
-   vfprintf(stream, fmt, args);
-   fflush(stream);
-
-   va_end(args);
+   if (current_set && current_set->hooks && current_set->hooks->on_debug_log) {
+      va_list args;
+      va_start(args, fmt);
+      char buf[2048];
+      vsnprintf(buf, sizeof(buf), fmt, args);
+      va_end(args);
+      current_set->hooks->on_debug_log(current_set->hooks->context, level, "[%s] %s", DBG_LEVELS[level], buf);
+   } else {
+      fprintf(stream, "[%s] ", DBG_LEVELS[level]);
+      va_list args;
+      va_start(args, fmt);
+      vfprintf(stream, fmt, args);
+      va_end(args);
+      fflush(stream);
+   }
 }
 // This function is used to write formatted messages to the log stream
 void writef(const char *fmt, ...) {

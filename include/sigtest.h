@@ -162,8 +162,8 @@ extern const st_assert_i Assert;
  * @brief Logger structure for test set logging
  */
 typedef struct st_logger_s {
-   void (*log)(const char *, ...);                     /* Logging function pointer */
-   void (*flog)(FILE *, const char *, ...);            /* File logging function pointer */
+   void (*log)(const char *, ...);                       /* Logging function pointer */
+   void (*flog)(FILE *, const char *, ...);              /* File logging function pointer */
    void (*debug)(DebugLevel, FILE *, const char *, ...); /* Debug logging function pointer */
 } st_logger_s;
 
@@ -203,7 +203,11 @@ typedef struct tc_context_s {
       RunnerState state;
       Logger logger;
    } info;
-   object data; // User-defined data
+   object data;         // User-defined data
+   char *output_buffer; // Buffered output for test
+   size_t buffer_used;
+   size_t buffer_size;
+   ts_time test_start; // Start time for test timing
 } tc_context;
 
 #if 1 // Test Registration Functions
@@ -281,19 +285,20 @@ typedef struct st_summary_s {
  * @brief Test hooks structure
  */
 typedef struct st_hooks_s {
-   const char *name;                                      // Hooks label
-   void (*before_set)(const TsInfo, tc_context *);        // Called before each test set
-   void (*after_set)(const TsInfo, tc_context *);         // Called after each test set
-   void (*before_test)(tc_context *);                     // Called before each test case
-   void (*after_test)(tc_context *);                      // Called after each test case
-   void (*on_start_test)(tc_context *);                   // Callback at the start of a test
-   void (*on_end_test)(tc_context *);                     // Callback at the end of a test
-   void (*on_error)(const char *, tc_context *);          // Callback on error
-   void (*on_test_result)(const TsInfo, tc_context *);    // Callback on test result
-   void (*on_memory_alloc)(size_t, object, tc_context *); // Callback on memory allocated
-   void (*on_memory_free)(object, tc_context *);          // Callback on memory freed
-   void (*on_set_summary)(const TsInfo, tc_context *, st_summary *); // Callback for set summary
-   tc_context *context;                                   // Hook internal context
+   const char *name;                                                  // Hooks label
+   void (*before_set)(const TsInfo, tc_context *);                    // Called before each test set
+   void (*after_set)(const TsInfo, tc_context *);                     // Called after each test set
+   void (*before_test)(tc_context *);                                 // Called before each test case
+   void (*after_test)(tc_context *);                                  // Called after each test case
+   void (*on_start_test)(tc_context *);                               // Callback at the start of a test
+   void (*on_end_test)(tc_context *);                                 // Callback at the end of a test
+   void (*on_error)(const char *, tc_context *);                      // Callback on error
+   void (*on_test_result)(const TsInfo, tc_context *);                // Callback on test result
+   void (*on_memory_alloc)(size_t, object, tc_context *);             // Callback on memory allocated
+   void (*on_memory_free)(object, tc_context *);                      // Callback on memory freed
+   void (*on_set_summary)(const TsInfo, tc_context *, st_summary *);  // Callback for set summary
+   void (*on_debug_log)(tc_context *, DebugLevel, const char *, ...); // Callback for debug logging
+   tc_context *context;                                               // Hook internal context
 } st_hooks_s;
 /**
  * @brief Test hooks registry

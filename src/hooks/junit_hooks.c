@@ -65,7 +65,8 @@ static void junit_append_testcase(const char *fmt, ...) {
    if (junit_testcase_allocated == 0) {
       junit_testcase_allocated = 1024;
       junit_testcase_xml = __real_malloc(junit_testcase_allocated);
-      if (!junit_testcase_xml) return;
+      if (!junit_testcase_xml)
+         return;
       junit_testcase_xml[0] = '\0';
    }
 
@@ -73,7 +74,8 @@ static void junit_append_testcase(const char *fmt, ...) {
    if (current_len + needed + 1 > junit_testcase_allocated) {
       junit_testcase_allocated = current_len + needed + 1;
       junit_testcase_xml = __real_realloc(junit_testcase_xml, junit_testcase_allocated);
-      if (!junit_testcase_xml) return;
+      if (!junit_testcase_xml)
+         return;
    }
 
    va_start(args, fmt);
@@ -184,6 +186,7 @@ struct st_hooks_s junit_hooks = {
     .on_memory_alloc = NULL,
     .on_memory_free = NULL,
     .on_set_summary = junit_on_set_summary,
+    .on_debug_log = NULL,
     .context = NULL,
 };
 
@@ -219,7 +222,7 @@ void junit_before_set(const TsInfo set, tc_context *context) {
 }
 
 void junit_on_set_summary(const TsInfo set, tc_context *context, st_summary *summary) {
-   (void)set; // unused
+   (void)set;     // unused
    (void)context; // unused
    (void)summary; // unused
    // Summary is handled in XML output in after_set
@@ -239,7 +242,7 @@ void junit_after_set(const TsInfo set, tc_context *context) {
    // Build the testsuite line with actual numbers
    char testsuite_line[512];
    sprintf(testsuite_line, "  <testsuite name=\"%s\" timestamp=\"%s\" hostname=\"%s\" "
-           "tests=\"%d\" failures=\"%d\" skipped=\"%d\" time=\"%.3f\">\n",
+                           "tests=\"%d\" failures=\"%d\" skipped=\"%d\" time=\"%.3f\">\n",
            set->name, extra->timestamp, extra->hostname, extra->total_tests, extra->failures, extra->skipped, total_elapsed);
    junit_append("%s", testsuite_line);
 
@@ -298,9 +301,9 @@ void junit_on_test_result(const TsInfo set, tc_context *context) {
    junit_append_testcase("    <testcase name=\"%s\" time=\"%.3f\"", xml_escape(set->tc_info->name), test_elapsed);
    if (set->tc_info->result.state == FAIL) {
       junit_append_testcase(">\n");
-      junit_append_testcase("      <failure message=\"%s\">%s</failure>\n", 
-                   xml_escape(set->tc_info->result.message ? set->tc_info->result.message : "Unknown failure"), 
-                   xml_escape(set->tc_info->result.message ? set->tc_info->result.message : "Unknown failure"));
+      junit_append_testcase("      <failure message=\"%s\">%s</failure>\n",
+                            xml_escape(set->tc_info->result.message ? set->tc_info->result.message : "Unknown failure"),
+                            xml_escape(set->tc_info->result.message ? set->tc_info->result.message : "Unknown failure"));
       junit_append_testcase("    </testcase>\n");
    } else if (set->tc_info->result.state == SKIP) {
       junit_append_testcase(">\n");
