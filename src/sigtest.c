@@ -34,6 +34,7 @@
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> // 	for jmp_buf and related functions
@@ -47,6 +48,9 @@ static TestSet current_set = NULL;
 
 // Static buffer for jump
 static jmp_buf jmpbuffer;
+
+// Forward declaration for DebugLogger
+extern const st_logger_s DebugLogger;
 
 //	Fail messages
 #define MESSAGE_TRUE_FAIL "Expected true, but was false"
@@ -79,6 +83,7 @@ static atomic_size_t global_allocs = 0;
 static atomic_size_t global_frees = 0;
 static int inside_test = 0;
 static int set_started = 0;
+static TestCase current_tc = NULL;
 size_t _sigtest_alloc_count = 0;
 size_t _sigtest_free_count = 0;
 
@@ -100,7 +105,14 @@ static HookRegistry *hook_registry = NULL;
  * Encapsulates the name of the test and the test case function pointer
  */
 typedef struct st_case_s {
-   string name;
+   struct {
+      string name;
+      struct {
+         TestState state;
+         string message;
+      } result;
+      int has_next;
+   } info;
    TestFunc test_func; /* Test function pointer */
    // encapsulate fuzzy test function pointer
    union {
@@ -111,12 +123,34 @@ typedef struct st_case_s {
    int expect_throw;   /* Expect throw flag */
    int is_fuzz;        /* Is fuzz test flag */
    FuzzType fuzz_type; /* Fuzz input type */
-   struct {
-      TestState state;
-      string message;
-   } test_result;
-   TestCase next; /* Pointer to the next test case */
+   TestCase next;      /* Pointer to the next test case */
+   int ran_no_newline;
+   int had_debug;
+   int running_len;
 } st_case_s;
+/**
+ * @brief Test set structure for global setup and cleanup
+ */
+typedef struct st_set_s {
+   struct {
+      string name;    /* Test set name */
+      TcInfo tc_info; /* Current test case info */
+      int count;      /* Number of test cases */
+      int passed;     /* Number of passed test cases */
+      int failed;     /* Number of failed test cases */
+      int skipped;    /* Number of skipped test cases */
+   } info;
+   CleanupFunc cleanup; /* Test set cleanup function */
+   CaseOp setup;        /* Test case setup function */
+   CaseOp teardown;     /* Test case teardown function */
+   FILE *log_stream;    /* Log stream for the test set */
+   TestCase cases;      /* Pointer to the test cases */
+   TestCase tail;       /* Pointer to the last test case */
+   TestCase current;    /* Current test case */
+   TestSet next;        /* Pointer to the next test set */
+   ST_Hooks hooks;      /* Hooks for the test set */
+   Logger logger;       /* Logger for the test set */
+} st_set_s;
 
 /*
  * hook_ctx_t - shared hook context structure
@@ -219,16 +253,16 @@ static void cleanup_test_runner(void) {
       TestCase tc = set->cases;
       while (tc) {
          TestCase next_tc = tc->next;
-         __real_free(tc->name);
-         if (tc->test_result.message)
-            __real_free(tc->test_result.message);
+         __real_free(tc->info.name);
+         if (tc->info.result.message)
+            __real_free(tc->info.result.message);
 
          __real_free(tc);
          tc = next_tc;
       }
 
       // __real_free test set
-      __real_free(set->name);
+      __real_free(set->info.name);
       if (set->log_stream != stdout && set->log_stream) {
          fclose(set->log_stream);
          set->log_stream = NULL;
@@ -329,11 +363,11 @@ static void format_fuzz_value(FuzzType type, const void *ptr, char *buf, size_t 
 
 void set_test_context(TestState result, const string message) {
    if (current_set && current_set->current) {
-      current_set->current->test_result.state = result;
-      if (current_set->current->test_result.message) {
-         __real_free(current_set->current->test_result.message);
+      current_set->current->info.result.state = result;
+      if (current_set->current->info.result.message) {
+         __real_free(current_set->current->info.result.message);
       }
-      current_set->current->test_result.message = message ? strdup(message) : NULL;
+      current_set->current->info.result.message = message ? strdup(message) : NULL;
       if (result != PASS) {
          // Stop assertions for this test
          longjmp(jmpbuffer, 1);
@@ -669,7 +703,7 @@ static void assert_skip(const string fmt, ...) {
 }
 #endif
 
-// Memory wrappers
+#if 1 // Region: Memory wrappers
 void *__wrap_malloc(size_t s) {
    void *p = __real_malloc(s);
    if (p) {
@@ -689,6 +723,7 @@ void __wrap_free(void *p) {
    }
    __real_free(p);
 }
+#endif
 
 // Assertion interface
 const st_assert_i Assert = {
@@ -722,17 +757,17 @@ void testset(string name, ConfigFunc config, CleanupFunc cleanup) {
       fwritelnf(stdout, "Failed to allocate memory for test set\n");
       exit(EXIT_FAILURE);
    }
-   set->name = strdup(name);
+   set->info.name = strdup(name);
    set->cleanup = cleanup;
    set->setup = NULL;
    set->teardown = NULL;
    set->log_stream = stdout;
    set->cases = NULL;
    set->tail = NULL;
-   set->count = 0;
-   set->passed = 0;
-   set->failed = 0;
-   set->skipped = 0;
+   set->info.count = 0;
+   set->info.passed = 0;
+   set->info.failed = 0;
+   set->info.skipped = 0;
    set->current = NULL;
    set->next = test_sets;
    /* do not allocate a logger here; assign default logger during set_init */
@@ -753,7 +788,7 @@ void testset(string name, ConfigFunc config, CleanupFunc cleanup) {
    /* logger will be set in set_init (default to DebugLogger) */
 
    // Handle allocation failure after config
-   if (!set->name) {
+   if (!set->info.name) {
       if (set->log_stream != stdout && set->log_stream)
          fclose(set->log_stream);
       __real_free(set);
@@ -783,7 +818,7 @@ void testcase(string name, TestFunc func) {
       current_set->tail = tc;
    }
 
-   current_set->count++;
+   current_set->info.count++;
 }
 // Register test to test registry with expectation to fail
 void fail_testcase(string name, void (*func)(void)) {
@@ -803,7 +838,7 @@ void fail_testcase(string name, void (*func)(void)) {
       current_set->tail = tc;
    }
 
-   current_set->count++;
+   current_set->info.count++;
 }
 // Register test to test registry with expectation to throw
 void testcase_throws(string name, void (*func)(void)) {
@@ -823,7 +858,7 @@ void testcase_throws(string name, void (*func)(void)) {
       current_set->tail = tc;
    }
 
-   current_set->count++;
+   current_set->info.count++;
 }
 // Register a fuzz test case
 void fuzz_testcase(string name, FuzzyFunc func, FuzzType type) {
@@ -844,7 +879,7 @@ void fuzz_testcase(string name, FuzzyFunc func, FuzzType type) {
       current_set->tail = tc;
    }
 
-   current_set->count++;
+   current_set->info.count++;
 }
 
 // Setup test case
@@ -866,19 +901,25 @@ static TestCase create_testcase(string name) {
       writef("Failed to allocate memory for test case `%s`\n", name);
       exit(EXIT_FAILURE);
    }
-   tc->name = strdup(name);
-   if (!tc->name) {
+   memset(&tc->info, 0, sizeof(TcInfo));
+   tc->info.name = strdup(name);
+   if (!tc->info.name) {
       writef("Failed to allocate memory for test case name `%s`\n", name);
       __real_free(tc);
       exit(EXIT_FAILURE);
    }
+   tc->info.result.state = PASS;
+   tc->info.result.message = NULL;
+   tc->info.has_next = FALSE;
+
    tc->is_fuzz = FALSE;
    tc->func.test = NULL;
    tc->expect_fail = FALSE;
    tc->expect_throw = FALSE;
-   tc->test_result.state = PASS;
-   tc->test_result.message = NULL;
    tc->next = NULL;
+   tc->ran_no_newline = 0;
+   tc->had_debug = 0;
+   tc->running_len = 0;
    return tc;
 }
 
@@ -894,73 +935,60 @@ void register_hooks(ST_Hooks hooks) {
    entry->next = hook_registry;
    hook_registry = entry;
 
+   current_hooks = hooks;
+
    if (current_set && !current_set->hooks) {
       current_set->hooks = hooks;
    }
 }
 //	default test hooks
-static struct {
-   int count;
-   int verbose;
-   ts_time start;
-   ts_time end;
-   RunnerState state;
-   int ran_no_newline;
-   int had_debug;
-   int running_len;
-} default_ctx = {0, 0, {0, 0}, {0, 0}, RUNNER_IDLE, 0, 0, 0};
+tc_context default_ctx = {{0, 0, {0, 0}, {0, 0}, RUNNER_IDLE, NULL}, NULL};
 
-static void default_before_test(object context) {
-   struct {
-      int count;
-      int verbose;
-      ts_time start;
-      ts_time end;
-   } *ctx = context;
-
-   ctx->count++;
+static void default_before_test(tc_context *ctx) {
+   (void)*ctx; // unused
+   default_ctx.info.count++;
 }
-static void default_on_start_test(object context) {
-   struct {
-      int count;
-      int verbose;
-      ts_time start;
-      ts_time end;
-   } *ctx = context;
-
-   if (sys_gettime(&ctx->start) == -1) {
+static void append_to_buffer(tc_context *ctx, const char *str) {
+   size_t len = strlen(str);
+   if (ctx->buffer_used + len >= ctx->buffer_size) {
+      ctx->buffer_size = (ctx->buffer_size + len + 1024) & ~1023; // round up to 1024
+      ctx->output_buffer = __real_realloc(ctx->output_buffer, ctx->buffer_size);
+   }
+   memcpy(ctx->output_buffer + ctx->buffer_used, str, len);
+   ctx->buffer_used += len;
+}
+static void default_on_start_test(tc_context *ctx) {
+   if (sys_gettime(&ctx->test_start) == -1) {
       fwritelnf(stderr, "Error: Failed to get system start time");
       exit(EXIT_FAILURE);
    }
    // zero out the end time
-   ctx->end = (ts_time){0, 0};
+   ctx->info.end = (ts_time){0, 0};
+
+   if (!ctx->output_buffer) {
+      ctx->buffer_size = 2048;
+      ctx->output_buffer = __real_malloc(ctx->buffer_size);
+   }
+   ctx->buffer_used = 0;
 
    TestCase tc = current_set ? current_set->current : NULL;
-   // Logger logger = current_set ? current_set->logger : NULL;
 
    (void)set_started; /* header is printed in before_set */
    if (tc) {
       inside_test = 1;
       /* Print Running without newline so result can be appended on same line if no debug output */
       char running_buf[128];
-      int len = snprintf(running_buf, sizeof(running_buf), "Running: %-*s", 40, tc->name);
+      int len = snprintf(running_buf, sizeof(running_buf), "Running: %-*s", 40, tc->info.name);
       FILE *stream = (current_set && current_set->log_stream) ? current_set->log_stream : stdout;
       fwritef(stream, "%s", running_buf);
       /* record that we've written Running without newline */
-      default_ctx.ran_no_newline = 1;
-      default_ctx.had_debug = 0;
-      default_ctx.running_len = len;
+      current_tc->ran_no_newline = 1;
+      current_tc->had_debug = 0;
+      current_tc->running_len = len;
    }
 }
-static void default_on_end_test(object context) {
-   struct {
-      int count;
-      int verbose;
-      ts_time start;
-      ts_time end;
-   } *ctx = context;
-
-   if (sys_gettime(&ctx->end) == -1) {
+static void default_on_end_test(tc_context *ctx) {
+   if (sys_gettime(&ctx->info.end) == -1) {
       fwritelnf(stderr, "Error: Failed to get system end time");
       exit(EXIT_FAILURE);
    }
@@ -968,82 +996,86 @@ static void default_on_end_test(object context) {
    inside_test = 0;
    /* end time recorded; final result printing occurs in on_test_result after process_result */
 }
-static void default_after_test(object context) {
-   struct {
-      int count;
-      int verbose;
-      ts_time start;
-      ts_time end;
-      RunnerState state;
-   } *ctx = context;
-
-   ctx->count--;
+static void default_after_test(tc_context *ctx) {
+   (void)*ctx; // unused
+   default_ctx.info.count--;
 }
-static void default_on_test_result(const TestSet set, const TestCase tc, object context) {
-   struct {
-      int count;
-      int verbose;
-      ts_time start;
-      ts_time end;
-      RunnerState state;
-      int ran_no_newline;
-      int had_debug;
-      int running_len;
-   } *ctx = context;
-
-   if (!set || !tc || !context)
+static void default_on_test_result(const TsInfo ts, tc_context *ctx) {
+   if (!ts || !ts->tc_info)
       return;
 
-   double elapsed = get_elapsed_ms(&ctx->start, &ctx->end);
-   const char *state_str = TEST_STATES[tc->test_result.state];
+   double elapsed = get_elapsed_ms(&ctx->test_start, &ctx->info.end);
+   const char *state_str = TEST_STATES[ts->tc_info->result.state];
 
-   char result_buf[64];
-   snprintf(result_buf, sizeof(result_buf), "%.3f µs [%s]", elapsed, state_str);
-
-   if (tc->test_result.state == FAIL && tc->test_result.message) {
-      /* print failure message indented */
-      fwritelnf(set->log_stream, "\n  - %s", tc->test_result.message);
-      ctx->had_debug = 1;
+   double elapsed_us = elapsed * 1000.0;
+   const char *unit = "µs";
+   double display_time = elapsed_us;
+   if (elapsed_us >= 1000.0) {
+      unit = "ms";
+      display_time = elapsed_us / 1000.0;
    }
-   if (!ctx->had_debug && ctx->ran_no_newline) {
+   char result_buf[64];
+   snprintf(result_buf, sizeof(result_buf), "%.3f %s [%s]", display_time, unit, state_str);
+
+   if (ts->tc_info->result.state == FAIL && ts->tc_info->result.message) {
+      /* append failure message indented */
+      char msg_buf[512];
+      snprintf(msg_buf, sizeof(msg_buf), "\n  - %s", ts->tc_info->result.message);
+      append_to_buffer(ctx, msg_buf);
+      current_tc->had_debug = 1;
+   }
+   if (!current_tc->had_debug && current_tc->ran_no_newline) {
 
       /* No debug output occurred; append result to the Running line. Use stored running_len. */
-      int pad = 80 - (ctx->running_len + (int)strlen(result_buf));
+      int pad = 80 - (current_tc->running_len + (int)strlen(result_buf));
       if (pad < 0)
          pad = 0;
-      /* print padding and result, then newline */
-      for (int i = 0; i < pad; ++i)
-         fputc(' ', set->log_stream);
-      fprintf(set->log_stream, "%s\n", result_buf);
+      /* append padding and result, then newline */
+      char pad_str[81];
+      memset(pad_str, ' ', pad);
+      pad_str[pad] = '\0';
+      append_to_buffer(ctx, pad_str);
+      append_to_buffer(ctx, result_buf);
+      append_to_buffer(ctx, "\n");
    } else {
-      // if (tc->test_result.state == FAIL && tc->test_result.message) {
-      //    /* print failure message indented */
-      //    fwritelnf(set->log_stream, "  - %s", tc->test_result.message);
-      // }
       /* right-justify result at column 80 on its own line */
       int pad = 80 - (int)strlen(result_buf);
       if (pad < 0)
          pad = 0;
-      fwritelnf(set->log_stream, "%*s%s", pad, "", result_buf);
+      char pad_str[81];
+      memset(pad_str, ' ', pad);
+      pad_str[pad] = '\0';
+      append_to_buffer(ctx, "\n");
+      append_to_buffer(ctx, pad_str);
+      append_to_buffer(ctx, result_buf);
+      append_to_buffer(ctx, "\n");
+   }
+
+   // Flush the buffer
+   if (ctx->output_buffer && ctx->buffer_used > 0) {
+      FILE *stream = (current_set && current_set->log_stream) ? current_set->log_stream : stdout;
+      fwrite(ctx->output_buffer, 1, ctx->buffer_used, stream);
+      fflush(stream);
    }
 
    /* reset flags for next test */
-   ctx->ran_no_newline = 0;
-   ctx->had_debug = 0;
-   ctx->running_len = 0;
+   current_tc->ran_no_newline = 0;
+   current_tc->had_debug = 0;
+   current_tc->running_len = 0;
 }
-static void default_on_error(const char *message, object context) {
-   struct {
-      int count;
-      int verbose;
-      ts_time start;
-      ts_time end;
-      RunnerState state;
-   } *ctx = context;
-
-   if (ctx->verbose && current_set) {
-      current_set->logger->log("Error in test [%s]: %s\n", current_set->current->name, message);
-   }
+static void default_on_debug_log(tc_context *ctx, DebugLevel level, const char *fmt, ...) {
+   va_list args;
+   va_start(args, fmt);
+   char buf[2048];
+   vsnprintf(buf, sizeof(buf), fmt, args);
+   va_end(args);
+   append_to_buffer(ctx, buf);
+   current_tc->had_debug = 1;
+}
+static void default_on_error(const char *message, tc_context *ctx) {
+   (void)*ctx;    // unused
+   (void)message; // unused
+   // Default error handling: do nothing
 }
 static void default_on_testcase_finish(void) {
    //  total up atomic allocation counts
@@ -1093,6 +1125,7 @@ static const st_hooks_s default_hooks = {
     .after_test = default_after_test,
     .on_error = default_on_error,
     .on_test_result = default_on_test_result,
+    .on_debug_log = default_on_debug_log,
     .context = &default_ctx,
 };
 
@@ -1115,7 +1148,7 @@ __attribute__((constructor)) static void init_default_hooks(void) {
         test executor entry point
 */
 int main(void) {
-   int retResult = run_tests(test_sets, NULL);
+   int retResult = run_tests(test_sets, current_hooks);
    cleanup_test_runner();
 
    return retResult;
@@ -1141,7 +1174,7 @@ static RunnerState process_result(TestCase, TestSet, ST_Hooks,
                                   int *, int *, int *, int *, int *);
 static RunnerState after_set(ST_Hooks, TestSet,
                              int, int, int, int, int);
-static void runner_summary(int, int, TestSet);
+static void runner_summary(int, int, TestSet, ST_Hooks);
 static int runner_done(TestSet);
 
 // the actual test runner
@@ -1165,7 +1198,7 @@ int run_tests(TestSet sets, ST_Hooks test_hooks) {
 
    RunnerState state = RUNNER_INIT;
    while (state != RUNNER_DONE) {
-      default_ctx.state = state; // update default context state
+      default_ctx.info.state = state; // update default context state
       switch (state) {
       case RUNNER_INIT:
          state = runner_init(sets, test_hooks, &total_tests, &total_sets, &hooks);
@@ -1247,8 +1280,8 @@ int run_tests(TestSet sets, ST_Hooks test_hooks) {
 
             break;
          default:
-            tc->test_result.state = FAIL;
-            tc->test_result.message = strdup("Invalid FuzzType in fuzz test");
+            tc->info.result.state = FAIL;
+            tc->info.result.message = strdup("Invalid FuzzType in fuzz test");
             return END_TEST; // or your next state
          }
          state = execute_fuzzing(tc, jmpbuffer, dataset, count, elem_size);
@@ -1289,7 +1322,7 @@ int run_tests(TestSet sets, ST_Hooks test_hooks) {
 
          break;
       case RUNNER_SUMMARY:
-         runner_summary(total_tests, total_sets, sets);
+         runner_summary(total_tests, total_sets, sets, test_hooks);
          state = RUNNER_DONE;
 
          break;
@@ -1372,13 +1405,14 @@ static RunnerState set_init(TestSet current_set_iter, int *tc_total_out, int *tc
    return BEFORE_SET;
 }
 static RunnerState before_set(ST_Hooks hooks, int set_sequence, TestSet current, char *timestamp) {
+   hooks->context->info.logger = current->logger;
    if (hooks && hooks->before_set) {
-      hooks->before_set(current, hooks->context);
+      hooks->before_set((TsInfo)&current->info, hooks->context);
    } else {
       get_timestamp(timestamp, "%Y-%m-%d  %H:%M:%S");
       char header[128];
       snprintf(header, sizeof(header), "[%d] %-25s : %4d : %20s",
-               set_sequence, current->name, current->count, timestamp);
+               set_sequence, current->info.name, current->info.count, timestamp);
       int pad = 80 - (int)strlen(header);
       if (pad < 0)
          pad = 0;
@@ -1395,10 +1429,12 @@ static RunnerState case_loop(TestCase *tc_iter) {
    return CASE_INIT;
 }
 static RunnerState case_init(TestCase tc, TestSet set) {
+   tc->info.has_next = (tc->next != NULL);
    set->current = tc; // Set current test for set_test_context
    return BEFORE_TEST;
 }
 static RunnerState before_test(ST_Hooks hooks) {
+   hooks->context->info.logger = current_set->logger;
    if (hooks && hooks->before_test) {
       hooks->before_test(hooks->context);
    }
@@ -1411,14 +1447,17 @@ static RunnerState setup_test(TestSet set) {
    return START_TEST;
 }
 static RunnerState start_test(ST_Hooks hooks) {
+   current_tc = current_set->current;
+   hooks->context->info.logger = current_set->logger;
    if (hooks && hooks->on_start_test) {
       hooks->on_start_test(hooks->context);
    } else {
-      default_hooks.on_start_test(hooks->context);
+      default_on_start_test(hooks->context);
    }
    return EXECUTE_TEST;
 }
 static RunnerState execute_test(TestCase tc, jmp_buf jmpbuffer) {
+   current_tc = tc;
    if (setjmp(jmpbuffer) == 0) {
       if (!tc->is_fuzz) {
          tc->func.test();
@@ -1431,6 +1470,7 @@ static RunnerState execute_test(TestCase tc, jmp_buf jmpbuffer) {
    return END_TEST;
 }
 static RunnerState execute_fuzzing(TestCase tc, jmp_buf jmpbuffer, const void *dataset, size_t count, size_t elem_size) {
+   current_tc = tc;
    int failed_count = 0;
    char val_buf[64];
 
@@ -1441,35 +1481,36 @@ static RunnerState execute_fuzzing(TestCase tc, jmp_buf jmpbuffer, const void *d
       writef("value = %-10.3s", val_buf);
 
       if (setjmp(jmpbuffer) == 0) {
-         tc->func.fuzz(input);
+         tc->func.fuzz((void *)input);
          writelnf("Okay");
       } else {
-         const char *msg = tc->test_result.message ? tc->test_result.message : "Unknown failure";
+         const char *msg = tc->info.result.message ? tc->info.result.message : "Unknown failure";
          writelnf("Failed:\n  - %s", msg);
          failed_count++;
 
          // Reset message for next iteration
-         if (tc->test_result.message) {
-            tc->test_result.message = NULL;
+         if (tc->info.result.message) {
+            tc->info.result.message = NULL;
          }
       }
    }
 
    // Final result for the fuzz test case
    if (failed_count == 0) {
-      tc->test_result.state = PASS;
-      tc->test_result.message = NULL;
+      tc->info.result.state = PASS;
+      tc->info.result.message = NULL;
    } else {
-      tc->test_result.state = FAIL;
+      tc->info.result.state = FAIL;
       char summary[128];
       snprintf(summary, sizeof(summary),
                "%ld of %zu fuzz iterations passed", count - failed_count, count);
-      tc->test_result.message = strdup(summary);
+      tc->info.result.message = strdup(summary);
    }
 
    return END_TEST;
 }
 static RunnerState end_test(ST_Hooks hooks) {
+   hooks->context->info.logger = current_set->logger;
    if (hooks && hooks->on_end_test) {
       hooks->on_end_test(hooks->context);
    }
@@ -1482,6 +1523,7 @@ static RunnerState teardown_test(TestSet set) {
    return AFTER_TEST;
 }
 static RunnerState after_test(ST_Hooks hooks) {
+   hooks->context->info.logger = current_set->logger;
    if (hooks && hooks->after_test) {
       hooks->after_test(hooks->context);
    }
@@ -1492,57 +1534,63 @@ static RunnerState process_result(TestCase tc, TestSet set, ST_Hooks hooks,
                                   int *tc_total, int *total_tests) {
    // VIRTUAL STATE: PROCESS_RESULT
    if (tc->expect_fail) {
-      if (tc->test_result.state == FAIL) {
-         tc->test_result.state = PASS;
-         if (tc->test_result.message) {
-            __real_free(tc->test_result.message);
-            tc->test_result.message = strdup("Expected failure occurred");
+      if (tc->info.result.state == FAIL) {
+         tc->info.result.state = PASS;
+         if (tc->info.result.message) {
+            __real_free(tc->info.result.message);
+            tc->info.result.message = strdup("Expected failure occurred");
          }
-      } else if (tc->test_result.state != SKIP) {
-         tc->test_result.state = FAIL;
-         if (tc->test_result.message)
-            __real_free(tc->test_result.message);
-         tc->test_result.message = strdup("Expected failure but passed");
+      } else if (tc->info.result.state != SKIP) {
+         tc->info.result.state = FAIL;
+         if (tc->info.result.message)
+            __real_free(tc->info.result.message);
+         tc->info.result.message = strdup("Expected failure but passed");
       }
    } else if (tc->expect_throw) {
-      if (tc->test_result.state == FAIL) {
-         tc->test_result.state = PASS;
-         if (tc->test_result.message) {
-            __real_free(tc->test_result.message);
-            tc->test_result.message = strdup("Expected throw occurred");
+      if (tc->info.result.state == FAIL) {
+         tc->info.result.state = PASS;
+         if (tc->info.result.message) {
+            __real_free(tc->info.result.message);
+            tc->info.result.message = strdup("Expected throw occurred");
          }
-      } else if (tc->test_result.state != SKIP) {
-         tc->test_result.state = FAIL;
-         if (tc->test_result.message)
-            __real_free(tc->test_result.message);
-         tc->test_result.message = strdup("Expected throw but passed");
+      } else if (tc->info.result.state != SKIP) {
+         tc->info.result.state = FAIL;
+         if (tc->info.result.message)
+            __real_free(tc->info.result.message);
+         tc->info.result.message = strdup("Expected throw but passed");
       }
    }
 
-   if (tc->test_result.state == PASS) {
+   if (tc->info.result.state == PASS) {
+      set->info.tc_info = (TcInfo)&tc->info;
+      hooks->context->info.logger = current_set->logger;
       if (hooks && hooks->on_test_result) {
-         hooks->on_test_result(set, tc, hooks->context);
+         hooks->on_test_result((TsInfo)&set->info, hooks->context);
       } else {
          set->logger->log("[PASS]\n");
       }
       (*tc_passed)++;
-      set->passed++;
-   } else if (tc->test_result.state == SKIP) {
+      set->info.passed++;
+   } else if (tc->info.result.state == SKIP) {
+      set->info.tc_info = (TcInfo)&tc->info;
+      hooks->context->info.logger = current_set->logger;
       if (hooks && hooks->on_test_result) {
-         hooks->on_test_result(set, tc, hooks->context);
+         hooks->on_test_result((TsInfo)&set->info, hooks->context);
       } else {
          set->logger->log("[SKIP]\n");
       }
       (*tc_skipped)++;
-      set->skipped++;
+      set->info.skipped++;
    } else {
+      set->info.tc_info = (TcInfo)&tc->info;
+      hooks->context->info.logger = current_set->logger;
       if (hooks && hooks->on_test_result) {
-         hooks->on_test_result(set, tc, hooks->context);
+         hooks->on_test_result((TsInfo)&set->info, hooks->context);
       } else {
-         set->logger->log("[FAIL]\n     %s", tc->test_result.message ? tc->test_result.message : "Unknown");
+         set->logger->log("[FAIL]\n     %s", tc->info.result.message ? tc->info.result.message : "Unknown");
       }
       (*tc_failed)++;
-      set->failed++;
+      set->info.failed++;
    }
 
    (*tc_total)++;
@@ -1553,36 +1601,51 @@ static RunnerState process_result(TestCase tc, TestSet set, ST_Hooks hooks,
 }
 static RunnerState after_set(ST_Hooks hooks, TestSet set,
                              int sequence, int tc_total, int tc_passed, int tc_failed, int tc_skipped) {
+   hooks->context->info.logger = current_set->logger;
    if (hooks && hooks->after_set) {
-      hooks->after_set(current_set, hooks->context);
+      hooks->after_set((TsInfo)&current_set->info, hooks->context);
    }
 
-   /* Emit per-set summary (use provided sequence and counters) */
-   print_sep(set->log_stream, 80);
-   char stats[128];
-   snprintf(stats, sizeof(stats), "[%d]     TESTS=%3d        PASS=%3d        FAIL=%3d        SKIP=%3d",
-            sequence, tc_total, tc_passed, tc_failed, tc_skipped);
-   fwritelnf(set->log_stream, "%s", stats);
+   /* Emit per-set summary */
+   st_summary summary = {
+       .sequence = sequence,
+       .tc_total = tc_total,
+       .tc_passed = tc_passed,
+       .tc_failed = tc_failed,
+       .tc_skipped = tc_skipped,
+       .total_mallocs = _sigtest_alloc_count,
+       .total_frees = _sigtest_free_count};
+   if (hooks && hooks->on_set_summary) {
+      hooks->on_set_summary((TsInfo)&current_set->info, hooks->context, &summary);
+   } else {
+      print_sep(set->log_stream, 80);
+      char stats[128];
+      snprintf(stats, sizeof(stats), "[%d]     TESTS=%3d        PASS=%3d        FAIL=%3d        SKIP=%3d",
+               sequence, tc_total, tc_passed, tc_failed, tc_skipped);
+      fwritelnf(set->log_stream, "%s", stats);
+   }
 
    /* file-local separator */
-   default_on_testset_finished();
+   if (false) {
+      default_on_testset_finished();
+   }
    if (set->cleanup) {
       set->cleanup();
    }
    return SET_LOOP;
 }
-static void runner_summary(int total_tests, int total_sets, TestSet set) {
+static void runner_summary(int total_tests, int total_sets, TestSet set, ST_Hooks test_hooks) {
    char timestamp[32];
    get_timestamp(timestamp, "%Y-%m-%d %H:%M:%S");
    char hdr[128];
-   snprintf(hdr, sizeof(hdr), "[%s]   Test Set:                    %s", timestamp, set->name);
+   snprintf(hdr, sizeof(hdr), "[%s]   Test Set:                    %s", timestamp, set->info.name);
    int hpad = 80 - (int)strlen(hdr);
    if (hpad < 0)
       hpad = 0;
    fwritelnf(stdout, "%s%*s", hdr, hpad, "");
    print_sep(stdout, 80);
    fwritelnf(stdout, "Tests run: %d, Passed: %d, Failed: %d, Skipped: %d",
-             total_tests, set->passed, set->failed, set->skipped);
+             total_tests, set->info.passed, set->info.failed, set->info.skipped);
    fwritelnf(stdout, "Total test sets registered: %d", total_sets);
    /* Print aggregate malloc/free totals with adjusted alignment */
    fwritelnf(stdout, "Total mallocs:              %zu", _sigtest_alloc_count);
@@ -1590,19 +1653,26 @@ static void runner_summary(int total_tests, int total_sets, TestSet set) {
 }
 static int runner_done(TestSet set) {
    // Final cleanup if needed
-   return set->failed > 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+   return set->info.failed > 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
 #if 1 // Region: Logging functions with formatted test ouput
 static void flog_debug(DebugLevel level, FILE *stream, const char *fmt, ...) {
-   va_list args;
-   va_start(args, fmt);
-
-   fprintf(stream, "[%s] ", DBG_LEVELS[level]);
-   vfprintf(stream, fmt, args);
-   fflush(stream);
-
-   va_end(args);
+   if (current_set && current_set->hooks && current_set->hooks->on_debug_log) {
+      va_list args;
+      va_start(args, fmt);
+      char buf[2048];
+      vsnprintf(buf, sizeof(buf), fmt, args);
+      va_end(args);
+      current_set->hooks->on_debug_log(current_set->hooks->context, level, "[%s] %s", DBG_LEVELS[level], buf);
+   } else {
+      fprintf(stream, "[%s] ", DBG_LEVELS[level]);
+      va_list args;
+      va_start(args, fmt);
+      vfprintf(stream, fmt, args);
+      va_end(args);
+      fflush(stream);
+   }
 }
 // This function is used to write formatted messages to the log stream
 void writef(const char *fmt, ...) {
@@ -1612,10 +1682,10 @@ void writef(const char *fmt, ...) {
    FILE *stream = (current_set && current_set->log_stream) ? current_set->log_stream : stdout;
    /* If Running was printed without newline and this is the first debug output, break the line
     * so debug lines start on the next line and are indented. Also mark that debug occurred. */
-   if (inside_test && default_ctx.ran_no_newline && strncmp(fmt, "Running:", 8) != 0 && strncmp(fmt, "[%d]", 4) != 0 && strncmp(fmt, "=", 1) != 0) {
+   if (inside_test && current_tc->ran_no_newline && strncmp(fmt, "Running:", 8) != 0 && strncmp(fmt, "[%d]", 4) != 0 && strncmp(fmt, "=", 1) != 0) {
       fputc('\n', stream);
-      default_ctx.ran_no_newline = 0;
-      default_ctx.had_debug = 1;
+      current_tc->ran_no_newline = 0;
+      current_tc->had_debug = 1;
    }
    if (inside_test && strncmp(fmt, "Running:", 8) != 0 && strncmp(fmt, "[%d]", 4) != 0 && strncmp(fmt, "=", 1) != 0) {
       fprintf(stream, "  - ");
@@ -1631,10 +1701,10 @@ void writelnf(const char *fmt, ...) {
    va_start(args, fmt);
 
    FILE *stream = (current_set && current_set->log_stream) ? current_set->log_stream : stdout;
-   if (inside_test && default_ctx.ran_no_newline && strncmp(fmt, "Running:", 8) != 0 && strncmp(fmt, "[%d]", 4) != 0 && strncmp(fmt, "=", 1) != 0) {
+   if (inside_test && current_tc->ran_no_newline && strncmp(fmt, "Running:", 8) != 0 && strncmp(fmt, "[%d]", 4) != 0 && strncmp(fmt, "=", 1) != 0) {
       fputc('\n', stream);
-      default_ctx.ran_no_newline = 0;
-      default_ctx.had_debug = 1;
+      current_tc->ran_no_newline = 0;
+      current_tc->had_debug = 1;
    }
    if (inside_test && strncmp(fmt, "Running:", 8) != 0 && strncmp(fmt, "[%d]", 4) != 0 && strncmp(fmt, "=", 1) != 0) {
       fprintf(stream, "  - ");
@@ -1679,7 +1749,7 @@ const sc_testrunner_i TestRunner = {
     .after_test = default_after_test,
 };
 // Public global DebugLogger interface
-const st_logger_i DebugLogger = {
+const st_logger_s DebugLogger = {
     .log = writelnf,
     .flog = fwritelnf,
     .debug = flog_debug};

@@ -1,12 +1,8 @@
 Test Source: test/test_configs.c
-[2] configs_set               :    3 : 2025-12-23  16:41:10                     
+[2] configs_set               :    3 : 2025-12-28  13:59:50                     
 ================================================================================
-Running: varargs_message                                        1.910 µs [PASS]
-Running: suite_config_cleanup                                   2.997 µs [PASS]
-Running: testcase_setup_teardown                                1.384 µs [PASS]
+Running: varargs_message                                         2.917 ms [PASS]
+Running: suite_config_cleanup                                    2.470 ms [PASS]
+Running: testcase_setup_teardown                                 2.227 ms [PASS]
 ================================================================================
 [2]     TESTS=  3        PASS=  3        FAIL=  0        SKIP=  0
-
-===== Memory Allocations Report ================================================
-  Total mallocs:               0
-  Total frees:                 0

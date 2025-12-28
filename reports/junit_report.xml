@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="junit_hooks" timestamp="2025-12-28T08:34:56Z" hostname="badkraft-XPS-15-7590" tests="5" failures="2" skipped="1" time="0.073">
+    <testcase name="JUnit: Should Pass" time="0.000"/>
+    <testcase name="JUnit: Should Fail" time="0.001">
+      <failure message="Expected true, but was false
+    - 1 should not equal 0">Expected true, but was false
+    - 1 should not equal 0</failure>
+    </testcase>
+    <testcase name="JUnit: Should Expect Fail" time="0.000"/>
+    <testcase name="JUnit: Should Skip" time="0.000">
+      <skipped/>
+    </testcase>
+    <testcase name="JUnit: Should Throw" time="0.000">
+      <failure message="Explicit throw triggered
+    - This test is explicitly thrown">Explicit throw triggered
+    - This test is explicitly thrown</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

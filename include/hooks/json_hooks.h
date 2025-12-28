@@ -24,28 +24,30 @@
  * File: json_hooks.h
  * Description: Header file for JSON output hooks for SigmaTest
  */
-#ifndef JSON_HOOKS_H
-#define JSON_HOOKS_H
+#pragma once
 
 #include "sigtest.h"
 
 struct JsonHookContext {
-   int count;
-   int verbose;
-   ts_time start;
-   ts_time end;
-   TestSet set;
+   struct {
+      int count;
+      int verbose;
+      ts_time start;
+      ts_time end;
+      RunnerState state;
+      Logger logger;
+   } info;
+   object data;
+   TsInfo set;
 };
 
 extern struct st_hooks_s json_hooks;
 
-void json_before_set(const TestSet set, object context);
-void json_after_set(const TestSet set, object context);
-void json_before_test(object context);
-void json_after_test(object context);
-void json_on_start_test(object context);
-void json_on_end_test(object context);
-void json_on_error(const char *message, object context);
-void json_on_test_result(const TestSet set, const TestCase tc, object context);
-
-#endif // JSON_HOOKS_H
+void json_before_set(const TsInfo set, tc_context *context);
+void json_after_set(const TsInfo set, tc_context *context);
+void json_before_test(tc_context *context);
+void json_after_test(tc_context *context);
+void json_on_start_test(tc_context *context);
+void json_on_end_test(tc_context *context);
+void json_on_error(const char *message, tc_context *context);
+void json_on_test_result(const TsInfo set, tc_context *context);

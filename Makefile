@@ -95,25 +95,8 @@ test_%: $(TST_BUILD_DIR)/test_%
 	@$<
 
 # === Full suite ===
-# Gather all test sources and corresponding test binaries
-TEST_SOURCES := $(wildcard $(TEST_DIR)/test_*.c)
-TEST_BINS := $(patsubst $(TEST_DIR)/test_%.c,$(TST_BUILD_DIR)/test_%,$(TEST_SOURCES))
-
-# `suite` builds all test binaries then runs them sequentially
-.PHONY: suite
-suite: $(TEST_BINS)
-	@echo "Running full test suite..."
-	@ret=0; for t in $(TEST_BINS); do \
-		echo "=== $$t ==="; \
-		$$t || ret=$$?; \
-	done; \
-	if [ $$ret -ne 0 ]; then \
-		echo "Full test suite completed with failures (exit=$$ret)"; \
-		exit $$ret; \
-	else \
-		echo "Full test suite completed successfully."; \
-	fi
-	@echo "Full test suite completed."
+suite: $(TST_BUILD_DIR)/run_tests
+	@$<
 
 # === Clean — SAFE, SILENT, NEVER TOUCHES bin/ ===
 clean:
@@ -124,7 +107,3 @@ clean:
 .PRECIOUS: $(TST_BUILD_DIR)/test_% $(TST_BUILD_DIR)/test_%_hooks
 
 .PHONY: lib cli clean test_% test_%_hooks suite
-
-# Keep `make test` as an alias for backward compatibility
-.PHONY: test
-test: suite

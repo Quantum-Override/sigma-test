@@ -1,4 +1,4 @@
-[2] stability_fuzz            :    5 : 2025-12-24  23:13:10                     
+[2] stability_fuzz            :    5 : 2025-12-28  13:58:35                     
 ================================================================================
 Running: fuzz value iteration                    
   - value = 0         [0] 0
@@ -11,7 +11,8 @@ Running: fuzz value iteration
   - Okay
   - value = 184       [4] 18446744073709551615
   - Okay
-                                                               39.062 µs [PASS]
+
+                                                                69.773 ms [PASS]
 Running: malloc boundary stress                  
   - value = 0           - Okay
   - value = 1           - Okay
@@ -26,7 +27,7 @@ Running: malloc boundary stress
     - malloc(18446744073709551615) failed unexpectedly
 
   - 2 of 5 fuzz iterations passed
-                                                               29.730 µs [FAIL]
+                                                                30.248 ms [FAIL]
 Running: int overflow handling                   
   - value = -21         - Okay
   - value = -21         - Okay
@@ -35,7 +36,8 @@ Running: int overflow handling
   - value = 1           - Okay
   - value = 214         - Okay
   - value = 214         - Okay
-                                                               34.214 µs [PASS]
+
+                                                                35.082 ms [PASS]
 Running: float special values                    
   - value = -IN         - Okay
   - value = -3.         - Okay
@@ -48,18 +50,15 @@ Running: float special values
   - value = NAN         - Okay
   - value = 1.1         - Okay
   - value = -1.         - Okay
-                                                               56.736 µs [PASS]
+
+                                                                57.648 ms [PASS]
 Running: byte input validation                   
   - value = -12         - Okay
   - value = -1          - Okay
   - value = 0           - Okay
   - value = 1           - Okay
   - value = 127         - Okay
-                                                               25.106 µs [PASS]
+
+                                                                25.807 ms [PASS]
 ================================================================================
 [2]     TESTS=  5        PASS=  4        FAIL=  1        SKIP=  0
-
-===== Memory Allocations Report ================================================
-Memory clean — all 2 allocations freed.
-  Total mallocs:               2
-  Total frees:                 2

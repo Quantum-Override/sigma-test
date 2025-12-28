@@ -38,18 +38,31 @@
 
 #include "sigtest.h"
 
-struct JunitHookContext {
-   int verbose;
+struct JunitExtraData {
    char timestamp[32];
    char hostname[256];
+   ts_time start_time;
+   ts_time test_start;
    int total_tests;
    int failures;
    int skipped;
-   TestSet set;
+   TsInfo set;
+};
+
+struct JunitHookContext {
+   struct {
+      int count;
+      int verbose;
+      ts_time start;
+      ts_time end;
+      RunnerState state;
+      Logger logger;
+   } info;
+   object data;
 };
 
 extern struct st_hooks_s junit_hooks;
 
-void junit_before_set(const TestSet set, object context);
-void junit_after_set(const TestSet set, object context);
-void junit_on_test_result(const TestSet set, const TestCase tc, object context);
+void junit_before_set(const TsInfo set, tc_context *context);
+void junit_after_set(const TsInfo set, tc_context *context);
+void junit_on_test_result(const TsInfo set, tc_context *context);
