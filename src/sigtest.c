@@ -1007,8 +1007,15 @@ static void default_on_test_result(const TsInfo ts, tc_context *ctx) {
    double elapsed = get_elapsed_ms(&ctx->test_start, &ctx->info.end);
    const char *state_str = TEST_STATES[ts->tc_info->result.state];
 
+   double elapsed_us = elapsed * 1000.0;
+   const char *unit = "µs";
+   double display_time = elapsed_us;
+   if (elapsed_us >= 1000.0) {
+      unit = "ms";
+      display_time = elapsed_us / 1000.0;
+   }
    char result_buf[64];
-   snprintf(result_buf, sizeof(result_buf), "%.3f µs [%s]", elapsed * 1000.0, state_str);
+   snprintf(result_buf, sizeof(result_buf), "%.3f %s [%s]", display_time, unit, state_str);
 
    if (ts->tc_info->result.state == FAIL && ts->tc_info->result.message) {
       /* append failure message indented */

@@ -1,29 +1,25 @@
 Test Source: test/test_controls.c
-[2] constrols_set             :    6 : 2025-12-24  19:09:17                     
+[2] constrols_set             :    6 : 2025-12-28  13:59:19                     
 ================================================================================
 Testcase setup called, count: 1
-Running: float_fail                                            17.408 µs [PASS]
+Running: float_fail                                              9.539 ms [PASS]
 Testcase teardown called, count: 1
 Testcase setup called, count: 2
-Running: string_fail                                            4.035 µs [PASS]
+Running: string_fail                                            31.640 ms [PASS]
 Testcase teardown called, count: 2
 Testcase setup called, count: 3
-Running: expect_fail_passes                                     3.468 µs [PASS]
+Running: expect_fail_passes                                      2.986 ms [PASS]
 Testcase teardown called, count: 3
 Testcase setup called, count: 4
-Running: complex_failure                                        4.841 µs [PASS]
+Running: complex_failure                                         3.092 ms [PASS]
 Testcase teardown called, count: 4
 Testcase setup called, count: 5
-Running: test_expect_exception                                  2.968 µs [PASS]
+Running: test_expect_exception                                  15.962 ms [PASS]
 Testcase teardown called, count: 5
 Testcase setup called, count: 6
 Running: test_expect_throw                       
   - Expected throw but passed
-                                                                2.615 µs [FAIL]
+                                                                 3.167 ms [FAIL]
 Testcase teardown called, count: 6
 ================================================================================
 [2]     TESTS=  6        PASS=  5        FAIL=  1        SKIP=  0
-
-===== Memory Allocations Report ================================================
-  Total mallocs:               0
-  Total frees:                 0

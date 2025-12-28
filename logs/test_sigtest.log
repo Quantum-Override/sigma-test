@@ -1,15 +1,15 @@
 Test Sigtest Log. Version 1.00.1-pre
 Test Source: test/test_sigtest.c
-[2] core_sigtest_set          :    9 : 2025-12-28  07:29:36                     
+[2] core_sigtest_set          :    9 : 2025-12-28  13:57:55                     
 ================================================================================
-Running: assertTrue                                             4.948 µs [PASS]
-Running: assertFalse                                            4.687 µs [PASS]
-Running: assertEquals                                           4.391 µs [PASS]
-Running: equalsFail                                             6.575 µs [PASS]
-Running: equalsFloatsFail                                       6.513 µs [PASS]
-Running: charEquals                                             2.521 µs [PASS]
-Running: pointersEqual                                          2.259 µs [PASS]
-Running: pointersNotEqual                                       2.892 µs [PASS]
-Running: stringsNotComparable                                   2.368 µs [PASS]
+Running: assertTrue                                              2.904 ms [PASS]
+Running: assertFalse                                             2.399 ms [PASS]
+Running: assertEquals                                            2.356 ms [PASS]
+Running: equalsFail                                              3.831 ms [PASS]
+Running: equalsFloatsFail                                        3.045 ms [PASS]
+Running: charEquals                                              2.372 ms [PASS]
+Running: pointersEqual                                           2.245 ms [PASS]
+Running: pointersNotEqual                                        2.847 ms [PASS]
+Running: stringsNotComparable                                    2.419 ms [PASS]
 ================================================================================
 [2]     TESTS=  9        PASS=  9        FAIL=  0        SKIP=  0

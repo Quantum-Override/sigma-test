@@ -1,20 +1,20 @@
 Test Source: test/test_logging.c
-[2] logging_set               :    5 : 2025-12-28  13:42:31                     
+[2] logging_set               :    5 : 2025-12-28  13:58:24                     
 ================================================================================
 Testcase setup called, count: 1
-Running: add                                                 3035.000 µs [PASS]
+Running: add                                                     3.268 ms [PASS]
 Testcase teardown called, count: 1
 
 Testcase setup called, count: 2
-Running: divide                                              2490.000 µs [PASS]
+Running: divide                                                  2.382 ms [PASS]
 Testcase teardown called, count: 2
 
 Testcase setup called, count: 3
-Running: divide_by_zero_fails                                3918.000 µs [PASS]
+Running: divide_by_zero_fails                                    3.680 ms [PASS]
 Testcase teardown called, count: 3
 
 Testcase setup called, count: 4
-Running: divide_by_zero_throws                               2658.000 µs [PASS]
+Running: divide_by_zero_throws                                   2.574 ms [PASS]
 Testcase teardown called, count: 4
 
 Testcase setup called, count: 5
@@ -24,7 +24,7 @@ Running: with_debug_logging
   - Second check passed, b = 3.14
   - Third check passed, str = hello
 
-                                                            12651.000 µs [PASS]
+                                                                12.213 ms [PASS]
 Testcase teardown called, count: 5
 
 ================================================================================
