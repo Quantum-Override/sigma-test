@@ -21,23 +21,28 @@ void hooks_test_throws(void) { Assert.throw("This test is explicitly thrown"); }
 // Register test cases
 __attribute__((constructor)) void init_sigtest_tests(void) {
    static struct JsonHookContext ctx = {
-       .count = 0,
-       .verbose = 0,
-       .start = {0, 0},
-       .end = {0, 0},
+       .info = {
+           .count = 0,
+           .verbose = 0,
+           .start = {0, 0},
+           .end = {0, 0},
+           .state = 0,
+           .logger = NULL,
+       },
+       .data = NULL,
        .set = NULL,
    };
    // Register the test set
-   testset("hooks_set", set_config, NULL);
+   testset("json_hooks", set_config, NULL);
 
    // Register the test hooks
-   json_hooks.context = &ctx;
+   json_hooks.context = (tc_context *)&ctx;
    register_hooks((ST_Hooks)&json_hooks);
 
    // Register the test cases
    testcase("JSON: Should Pass", hooks_test_true);
-   testcase("JSON: Should Fail", hooks_test_fail);
+   fail_testcase("JSON: Should Fail", hooks_test_fail);
    fail_testcase("JSON: Should Expect Fail", expect_fail);
    testcase("JSON: Should Skip", hooks_test_skip);
-   testcase("JSON: Should Throw", hooks_test_throws);
+   fail_testcase("JSON: Should Throw", hooks_test_throws);
 }

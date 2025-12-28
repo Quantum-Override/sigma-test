@@ -1,31 +1,31 @@
 Test Source: test/test_asserts.c
-[2] asserts_set               :   16 : 2025-12-24  21:28:45                     
+[2] asserts_set               :   16 : 2025-12-25  11:24:55                     
 ================================================================================
-Running: Assert Is Null                                         2.886 µs [PASS]
-Running: Assert Is Not Null                                     2.777 µs [PASS]
-Running: Assert Int Not Equal                                   2.422 µs [PASS]
-Running: Assert Float Not Equal                                 2.780 µs [PASS]
-Running: Assert Strings Not Comparable                          4.066 µs [PASS]
-Running: Assert Float Within                                    9.288 µs [PASS]
-Running: Assert Float Not Within                                5.233 µs [PASS]
-Running: Assert String Equal                                    3.642 µs [PASS]
-Running: Assert String Not Equal                                4.045 µs [PASS]
-Running: Assert String Case Insensitive                         3.353 µs [PASS]
-Running: Assert String Case Sensitive                           5.425 µs [PASS]
-Running: Assert Fail Test Case                                  4.120 µs [PASS]
-Running: Assert Skip Test Case                                  3.919 µs [SKIP]
+Running: Assert Is Null                                         6.230 µs [PASS]
+Running: Assert Is Not Null                                     5.294 µs [PASS]
+Running: Assert Int Not Equal                                   5.420 µs [PASS]
+Running: Assert Float Not Equal                                 3.105 µs [PASS]
+Running: Assert Strings Not Comparable                          3.706 µs [PASS]
+Running: Assert Float Within                                    3.466 µs [PASS]
+Running: Assert Float Not Within                                4.523 µs [PASS]
+Running: Assert String Equal                                    3.821 µs [PASS]
+Running: Assert String Not Equal                                4.863 µs [PASS]
+Running: Assert String Case Insensitive                         3.101 µs [PASS]
+Running: Assert String Case Sensitive                           2.757 µs [PASS]
+Running: Assert Fail Test Case                                  2.600 µs [PASS]
+Running: Assert Skip Test Case                                  2.495 µs [SKIP]
 Running: Assert Int Equal Fail                   
   - Expected 5, but was 3
     - 5 should equal 3
-                                                                5.083 µs [FAIL]
+                                                                3.025 µs [FAIL]
 Running: Assert Float Equal Fail                 
   - Expected 5.00000, but was 3.00000
     - 5.00 should equal 3.00
-                                                                3.293 µs [FAIL]
+                                                                3.092 µs [FAIL]
 Running: Assert Pointer Equal Fail               
-  - Expected 0x7ffcb4411020, but was 0x7ffcb4411024
-    - Pointers 0x7ffcb4411020 and 0x7ffcb4411024 should be equal
-                                                                3.053 µs [FAIL]
+  - Expected 0x7ffc3c207330, but was 0x7ffc3c207334
+    - Pointers 0x7ffc3c207330 and 0x7ffc3c207334 should be equal
+                                                                2.997 µs [FAIL]
 ================================================================================
 [2]     TESTS= 16        PASS= 12        FAIL=  3        SKIP=  1
 

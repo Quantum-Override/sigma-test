@@ -35,8 +35,12 @@
    David Boarman
  */
 
+void json_on_set_summary(const TsInfo set, tc_context *context, st_summary *summary);
+
 extern double get_elapsed_ms(ts_time *, ts_time *);
 extern int sys_gettime(ts_time *);
+extern size_t _sigtest_alloc_count;
+extern size_t _sigtest_free_count;
 
 struct st_hooks_s json_hooks = {
     .name = "json",
@@ -48,67 +52,70 @@ struct st_hooks_s json_hooks = {
     .on_end_test = json_on_end_test,
     .on_error = json_on_error,
     .on_test_result = json_on_test_result,
+    .on_set_summary = json_on_set_summary,
     .context = NULL,
 };
 
-void json_before_set(const TestSet set, object context) {
-   struct JsonHookContext *ctx = context;
+void json_before_set(const TsInfo set, tc_context *context) {
+   struct JsonHookContext *ctx = (struct JsonHookContext *)context;
    ctx->set = set; // Store set for use in other hooks
 
    char timestamp[32];
    get_timestamp(timestamp, "%Y-%m-%d %H:%M:%S");
-   set->logger->log("{\n");
-   set->logger->log("  \"test_set\": \"%s\",\n", set->name);
-   set->logger->log("  \"timestamp\": \"%s\",\n", timestamp);
-   set->logger->log("  \"tests\": [\n");
+   context->info.logger->log("{\n");
+   context->info.logger->log("  \"test_set\": \"%s\",\n", set->name);
+   context->info.logger->log("  \"timestamp\": \"%s\",\n", timestamp);
+   context->info.logger->log("  \"tests\": [\n");
 }
-void json_after_set(const TestSet set, object context) {
-   set->logger->log("  ],\n");
-   set->logger->log("  \"summary\": {\n");
-   set->logger->log("    \"total\": %d,\n", set->count);
-   set->logger->log("    \"passed\": %d,\n", set->passed);
-   set->logger->log("    \"failed\": %d,\n", set->failed);
-   set->logger->log("    \"skipped\": %d\n", set->skipped);
-   set->logger->log("  }\n");
-   set->logger->log("}\n");
+void json_after_set(const TsInfo set, tc_context *context) {
+   context->info.logger->log("  ],\n");
+   context->info.logger->log("  \"summary\": {\n");
+   context->info.logger->log("    \"total\": %d,\n", set->count);
+   context->info.logger->log("    \"passed\": %d,\n", set->passed);
+   context->info.logger->log("    \"failed\": %d,\n", set->failed);
+   context->info.logger->log("    \"skipped\": %d,\n", set->skipped);
+   context->info.logger->log("    \"total_mallocs\": %zu,\n", _sigtest_alloc_count);
+   context->info.logger->log("    \"total_frees\": %zu\n", _sigtest_free_count);
+   context->info.logger->log("  }\n");
+   context->info.logger->log("}\n");
 }
-void json_before_test(object context) {
+void json_before_test(tc_context *context) {
    // Placeholder for any setup before each test
 }
-void json_after_test(object context) {
+void json_after_test(tc_context *context) {
    // Placeholder for any cleanup after each test
 }
-void json_on_start_test(object context) {
-   struct JsonHookContext *ctx = context;
+void json_on_start_test(tc_context *context) {
+   struct JsonHookContext *ctx = (struct JsonHookContext *)context;
 
-   ctx->end.tv_sec = 0;
-   ctx->end.tv_nsec = 0;
+   ctx->info.end.tv_sec = 0;
+   ctx->info.end.tv_nsec = 0;
 
-   if (sys_gettime(&ctx->start) == -1) {
+   if (sys_gettime(&ctx->info.start) == -1) {
       DebugLogger.flog(stderr, "Error: Failed to get system start time");
       exit(EXIT_FAILURE);
    }
 
-   if (ctx->verbose && ctx->set) {
-      ctx->set->logger->log("    \"start_test\": \"%s\",\n", ctx->set->current->name);
+   if (ctx->info.verbose && ctx->set) {
+      context->info.logger->log("    \"start_test\": \"%s\",\n", ctx->set->tc_info->name);
    }
 }
-void json_on_end_test(object context) {
-   struct JsonHookContext *ctx = context;
+void json_on_end_test(tc_context *context) {
+   struct JsonHookContext *ctx = (struct JsonHookContext *)context;
 
-   if (sys_gettime(&ctx->end) == -1) {
+   if (sys_gettime(&ctx->info.end) == -1) {
       DebugLogger.flog(stderr, "Error: Failed to get system end time");
       exit(EXIT_FAILURE);
    }
 
-   if (ctx->verbose && ctx->set) {
-      ctx->set->logger->log("    \"end_test\": \"%s\",\n", ctx->set->current->name);
+   if (ctx->info.verbose && ctx->set) {
+      context->info.logger->log("    \"end_test\": \"%s\",\n", ctx->set->tc_info->name);
    }
 }
-void json_on_error(const char *message, object context) {
-   struct JsonHookContext *ctx = context;
+void json_on_error(const char *message, tc_context *context) {
+   struct JsonHookContext *ctx = (struct JsonHookContext *)context;
 
-   if (ctx->verbose && ctx->set) {
+   if (ctx->info.verbose && ctx->set) {
       char escaped[512];
       char *dst = escaped;
       for (const char *src = message; *src && dst < escaped + sizeof(escaped) - 2; src++) {
@@ -117,15 +124,15 @@ void json_on_error(const char *message, object context) {
          *dst++ = *src;
       }
       *dst = '\0';
-      ctx->set->logger->log("    \"error\": \"%s\",\n", escaped);
+      context->info.logger->log("    \"error\": \"%s\",\n", escaped);
    }
 }
-void json_on_test_result(const TestSet set, const TestCase tc, object context) {
-   struct JsonHookContext *ctx = context;
+void json_on_test_result(const TsInfo set, tc_context *context) {
+   struct JsonHookContext *ctx = (struct JsonHookContext *)context;
 
    // get test state label
    const char *status = NULL;
-   switch (tc->test_result.state) {
+   switch (set->tc_info->result.state) {
    case PASS:
       status = "PASS";
       break;
@@ -141,28 +148,36 @@ void json_on_test_result(const TestSet set, const TestCase tc, object context) {
    }
 
    // Output test result in JSON format
-   double elapsed_ms = get_elapsed_ms(&ctx->start, &ctx->end);
-   char duration_str[16];
-   if (elapsed_ms < 0.0001)
-      snprintf(duration_str, sizeof(duration_str), "< 0.1");
-   else
-      snprintf(duration_str, sizeof(duration_str), "%.3f", elapsed_ms * 1000.0);
+   double elapsed_ms = get_elapsed_ms(&ctx->info.start, &ctx->info.end);
 
    char message[256];
-   snprintf(message, sizeof(message), "%s", tc->test_result.message ? tc->test_result.message : "");
+   snprintf(message, sizeof(message), "%s", set->tc_info->result.message ? set->tc_info->result.message : "");
    char escaped_message[512];
    char *dst = escaped_message;
    for (const char *src = message; *src && dst < escaped_message + sizeof(escaped_message) - 2; src++) {
-      if (*src == '"')
+      if (*src == '"') {
          *dst++ = '\\';
-      *dst++ = *src;
+         *dst++ = '"';
+      } else if (*src == '\n') {
+         *dst++ = '\\';
+         *dst++ = 'n';
+      } else {
+         *dst++ = *src;
+      }
    }
    *dst = '\0';
 
-   set->logger->log("    {\n");
-   set->logger->log("      \"test\": \"%s\",\n", tc->name);
-   set->logger->log("      \"status\": \"%s\",\n", status);
-   set->logger->log("      \"duration_us\": \"%s\",\n", duration_str);
-   set->logger->log("      \"message\": \"%s\"\n", escaped_message);
-   set->logger->log("    }%s\n", tc->next ? "," : "");
+   context->info.logger->log("    {\n");
+   context->info.logger->log("      \"test\": \"%s\",\n", set->tc_info->name);
+   context->info.logger->log("      \"status\": \"%s\",\n", status);
+   context->info.logger->log("      \"duration_us\": %.3f,\n", elapsed_ms * 1000.0);
+   context->info.logger->log("      \"message\": \"%s\"\n", escaped_message);
+   context->info.logger->log("    }%s\n", set->tc_info->has_next ? "," : "");
+}
+
+void json_on_set_summary(const TsInfo set, tc_context *context, st_summary *summary) {
+   (void)set; // unused
+   (void)context; // unused
+   (void)summary; // unused
+   // Summary is handled in JSON output in after_set
 }

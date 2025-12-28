@@ -1,8 +1,8 @@
 {
 
-  "test_set": "hooks_set",
+  "test_set": "json_hooks",
 
-  "timestamp": "2025-12-23 16:41:10",
+  "timestamp": "2025-12-28 07:30:57",
 
   "tests": [
 
@@ -12,7 +12,7 @@
 
       "status": "PASS",
 
-      "duration_us": "448.000",
+      "duration_us": 346.000,
 
       "message": ""
 
@@ -22,12 +22,11 @@
 
       "test": "JSON: Should Fail",
 
-      "status": "FAIL",
+      "status": "PASS",
 
-      "duration_us": "803.000",
+      "duration_us": 743.000,
 
-      "message": "Expected true, but was false
-    - 1 should not equal 0"
+      "message": "Expected failure occurred"
 
     },
 
@@ -37,7 +36,7 @@
 
       "status": "PASS",
 
-      "duration_us": "386.000",
+      "duration_us": 340.000,
 
       "message": "Expected failure occurred"
 
@@ -49,10 +48,9 @@
 
       "status": "SKIP",
 
-      "duration_us": "324.000",
+      "duration_us": 274.000,
 
-      "message": "Testcase skipped
-    - This test is skipped"
+      "message": "Testcase skipped\n    - This test is skipped"
 
     },
 
@@ -60,12 +58,11 @@
 
       "test": "JSON: Should Throw",
 
-      "status": "FAIL",
+      "status": "PASS",
 
-      "duration_us": "334.000",
+      "duration_us": 341.000,
 
-      "message": "Explicit throw triggered
-    - This test is explicitly thrown"
+      "message": "Expected failure occurred"
 
     }
 
@@ -75,19 +72,17 @@
 
     "total": 5,
 
-    "passed": 2,
+    "passed": 4,
 
-    "failed": 2,
+    "failed": 0,
 
-    "skipped": 1
+    "skipped": 1,
+
+    "total_mallocs": 0,
+
+    "total_frees": 0
 
   }
 
 }
 
-================================================================================
-[2]     TESTS=  5        PASS=  2        FAIL=  2        SKIP=  1
-
-===== Memory Allocations Report ================================================
-  Total mallocs:               0
-  Total frees:                 0
